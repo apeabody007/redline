@@ -24,7 +24,20 @@ final class TemperatureSensors {
     /// The service handles below are only valid while their parent client is
     /// alive, so this reference has to be held for the life of the object.
     private var client: AnyObject?
-    private var services: [AnyObject] = []
+
+    private struct Sensor {
+        let service: AnyObject
+        let name: String
+    }
+
+    /// Names are resolved once at startup rather than on every tick. They never
+    /// change, and copying 39 strings a second across the HID boundary cost
+    /// more than reading the temperatures did.
+    private var sensors: [Sensor] = []
+
+    /// Pre-filtered so the once-a-second path touches only the sensors that can
+    /// actually win `max`, instead of walking the peripherals every time.
+    private var dieSensors: [Sensor] = []
 
     /// kIOHIDEventTypeTemperature. The value field is that type shifted into
     /// the high half of the field identifier.
@@ -36,7 +49,7 @@ final class TemperatureSensors {
     /// and barely moves under load, so it would peg the readout high forever.
     private static let ignored = ["battery", "gas gauge", "charger", "ambient", "nand", "tcal"]
 
-    var isAvailable: Bool { client != nil && !services.isEmpty }
+    var isAvailable: Bool { client != nil && !sensors.isEmpty }
 
     init() {
         guard let handle = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY),
@@ -61,14 +74,27 @@ final class TemperatureSensors {
 
         // PrimaryUsagePage 0xff00 / PrimaryUsage 5 is the temperature sensor page.
         setMatching(client, ["PrimaryUsagePage": 0xff00, "PrimaryUsage": 5] as CFDictionary)
-        services = copyServices(client)?.takeRetainedValue() as? [AnyObject] ?? []
+        let services = copyServices(client)?.takeRetainedValue() as? [AnyObject] ?? []
+
+        sensors = services.map { service in
+            let name = (copyProperty?(service, "Product" as CFString)?
+                .takeRetainedValue() as? String) ?? "(unnamed)"
+            return Sensor(service: service, name: name)
+        }
+        dieSensors = sensors.filter { sensor in
+            let name = sensor.name.lowercased()
+            return !Self.ignored.contains(where: name.contains)
+        }
     }
 
     /// Hottest die sensor in degrees Celsius, or nil if this Mac will not say.
+    /// This runs once a second, so it does nothing but read the pre-filtered
+    /// set: no matching, no string copies, no allocation per sensor.
     func peakDieTemperature() -> Double? {
         var peak: Double?
-        for reading in readings(includingPeripherals: false) {
-            peak = max(peak ?? reading.celsius, reading.celsius)
+        for sensor in dieSensors {
+            guard let celsius = read(sensor) else { continue }
+            peak = max(peak ?? celsius, celsius)
         }
         return peak
     }
@@ -76,27 +102,18 @@ final class TemperatureSensors {
     /// Every readable sensor, for the `--sensors` diagnostic dump. Run it on a
     /// new machine to confirm the readings survived the move.
     func allReadings() -> [(name: String, celsius: Double)] {
-        readings(includingPeripherals: true).sorted { $0.celsius > $1.celsius }
+        sensors.compactMap { sensor in
+            read(sensor).map { (name: sensor.name, celsius: $0) }
+        }
+        .sorted { $0.celsius > $1.celsius }
     }
 
-    private func readings(includingPeripherals: Bool) -> [(name: String, celsius: Double)] {
-        guard isAvailable, let copyProperty, let copyEvent, let floatValue else { return [] }
-
-        var out: [(name: String, celsius: Double)] = []
-        for service in services {
-            let name = (copyProperty(service, "Product" as CFString)?
-                .takeRetainedValue() as? String) ?? "(unnamed)"
-            if !includingPeripherals,
-               Self.ignored.contains(where: { name.lowercased().contains($0) }) { continue }
-
-            guard let event = copyEvent(service, Self.temperatureEventType, 0, 0)?
-                .takeRetainedValue() else { continue }
-            let celsius = floatValue(event, Self.temperatureField)
-
-            // Unused sensors read at or below zero, disconnected ones read wild.
-            guard celsius > 1, celsius < 130 else { continue }
-            out.append((name, celsius))
-        }
-        return out
+    private func read(_ sensor: Sensor) -> Double? {
+        guard let copyEvent, let floatValue,
+              let event = copyEvent(sensor.service, Self.temperatureEventType, 0, 0)?
+                .takeRetainedValue() else { return nil }
+        let celsius = floatValue(event, Self.temperatureField)
+        // Unused sensors read at or below zero, disconnected ones read wild.
+        return (celsius > 1 && celsius < 130) ? celsius : nil
     }
 }
