@@ -11,7 +11,7 @@ thermal pressure.
 
 <img src="docs/screenshot.png" width="700" alt="The Redline pill floating over a desktop, reading CPU 13%, GPU 11%, RAM 73%, 102°F">
 
-No dock icon, one menu bar item, about 450 lines of Swift. Builds with the
+No dock icon, one menu bar item, about 650 lines of Swift. Builds with the
 Xcode Command Line Tools alone, so you do not need a 12 GB Xcode install to
 compile it.
 
@@ -96,6 +96,17 @@ own preferences.
 Sensor names are resolved once at startup rather than every tick, and the
 peripheral sensors are filtered out at startup too, which cut idle CPU by 62%
 over the naive version that walked all 39 services every second.
+
+## Uninstall
+
+```
+launchctl disable "gui/$(id -u)/dev.aaronpeabody.redline" 2>/dev/null
+rm -rf /Applications/Redline.app
+defaults delete dev.aaronpeabody.redline
+```
+
+The middle line is the only one that matters if you never turned on Launch at
+Login. The last one clears the remembered position and menu settings.
 
 ## Requirements
 

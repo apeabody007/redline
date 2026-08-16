@@ -7,6 +7,26 @@ import SwiftUI
 UserDefaults.standard.register(defaults: [Temp.key: Temp.defaultsToFahrenheit,
                                           Appearance.severityKey: true])
 
+// Anything unrecognized used to fall through and silently launch a second copy
+// of the HUD, which is a poor answer to someone typing --help.
+let arguments = Array(CommandLine.arguments.dropFirst())
+if let unknown = arguments.first(where: { !["--once", "--sensors"].contains($0) }) {
+    let usage = """
+        Redline, a floating vitals readout for Apple Silicon Macs.
+
+          Redline              show the HUD (default)
+          Redline --once       print one reading and exit
+          Redline --sensors    list every temperature sensor this Mac exposes
+          Redline --help       show this
+        """
+    if unknown == "--help" || unknown == "-h" {
+        print(usage)
+        exit(0)
+    }
+    FileHandle.standardError.write(Data("unknown option: \(unknown)\n\n\(usage)\n".utf8))
+    exit(2)
+}
+
 // `redline --sensors` dumps every temperature sensor this Mac exposes and exits.
 // Run it on a new machine to confirm the readings survived the move.
 if CommandLine.arguments.contains("--sensors") {
