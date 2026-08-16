@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Clamp tests
+        run: ./build.sh test
+
+      - name: Build
+        run: ./build.sh
+
+      # The runner is a VM with no GPU accelerator and no thermal sensors, so
+      # this asserts the thing that actually matters about those readings:
+      # they drop out cleanly instead of crashing or reporting a wrong number.
+      - name: Run headless
+        run: |
+          out=$(./build/Redline.app/Contents/MacOS/Redline --once)
+          echo "$out"
+          echo "$out" | grep -q '^CPU ' || { echo "no CPU reading"; exit 1; }
+          echo "$out" | grep -q '^RAM ' || { echo "no RAM reading"; exit 1; }
+          echo "$out" | grep -q '^Thermal ' || { echo "no thermal state"; exit 1; }
+
+      - name: Sensor discovery does not crash
+        run: ./build/Redline.app/Contents/MacOS/Redline --sensors
