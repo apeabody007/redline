@@ -9,9 +9,7 @@ CPU, GPU, memory usage and die temperature in one always-on-top pill you can
 park anywhere on screen, plus a throttle warning the moment macOS reports
 thermal pressure.
 
-```
-CPU  26%   GPU   6%   RAM  77%   110°F
-```
+<img src="docs/screenshot.png" width="700" alt="The Redline pill floating over a desktop, reading CPU 13%, GPU 11%, RAM 73%, 102°F">
 
 No dock icon, one menu bar item, about 450 lines of Swift. Builds with the
 Xcode Command Line Tools alone, so you do not need a 12 GB Xcode install to
