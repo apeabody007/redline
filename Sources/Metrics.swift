@@ -12,6 +12,7 @@ struct Sample {
     var ramUsedGB: Double = 0
     var tempC: Double?
     var thermal: ProcessInfo.ThermalState = .nominal
+    var memoryPressure: MemoryPressure = .normal
 }
 
 /// Slides `frame` horizontally until it sits inside `bounds`.
@@ -25,6 +26,38 @@ func clampedHorizontally(_ frame: CGRect, into bounds: CGRect) -> CGRect {
     let rightmost: CGFloat = max(bounds.maxX - frame.size.width, bounds.minX)
     let x: CGFloat = min(max(frame.origin.x, bounds.minX), rightmost)
     return CGRect(origin: CGPoint(x: x, y: frame.origin.y), size: frame.size)
+}
+
+/// macOS's own verdict on memory, which is a different question from how much
+/// is in use. A Mac deliberately fills RAM with caches and compressed pages, so
+/// a high percentage on its own says nothing. This says whether it hurts.
+enum MemoryPressure: Int {
+    case normal = 1
+    case warning = 2
+    case critical = 4
+
+    private static let key = "kern.memorystatus_vm_pressure_level"
+
+    /// Anything unrecognized reads as normal. Inventing alarm from a value we
+    /// do not understand would be worse than staying quiet.
+    static func from(_ raw: Int32) -> MemoryPressure {
+        MemoryPressure(rawValue: Int(raw)) ?? .normal
+    }
+
+    static var current: MemoryPressure {
+        var level: Int32 = 1
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname(key, &level, &size, nil, 0) == 0 else { return .normal }
+        return from(level)
+    }
+
+    var label: String {
+        switch self {
+        case .normal:   return "normal"
+        case .warning:  return "warning"
+        case .critical: return "critical"
+        }
+    }
 }
 
 enum Appearance: String, CaseIterable {
@@ -96,6 +129,7 @@ final class Sampler: ObservableObject {
         s.ramUsedGB = mem.usedGB
         s.tempC = sensors.peakDieTemperature()
         s.thermal = ProcessInfo.processInfo.thermalState
+        s.memoryPressure = MemoryPressure.current
         sample = s
     }
 

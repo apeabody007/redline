@@ -9,13 +9,14 @@ struct HUDView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            // Memory turns amber earlier than the processors: a Mac at 80% CPU
-            // is working, a Mac at 80% memory is about to start swapping.
-            readout("CPU", percent: vitals.cpu, warm: 0.70, hot: 0.90)
+            readout("CPU", percent: vitals.cpu, tint: usageTint(vitals.cpu))
             if let gpu = vitals.gpu {
-                readout("GPU", percent: gpu, warm: 0.70, hot: 0.90)
+                readout("GPU", percent: gpu, tint: usageTint(gpu))
             }
-            readout("RAM", percent: vitals.ram, warm: 0.75, hot: 0.90)
+            // Memory is tinted by macOS's pressure verdict rather than by the
+            // percentage. A Mac deliberately fills RAM, so 71% used might be
+            // perfectly healthy or might be thrashing, and only the OS knows.
+            readout("RAM", percent: vitals.ram, tint: pressureTint)
             if let temp = vitals.tempC {
                 Text(Temp.string(temp, fahrenheit: fahrenheit))
                     .foregroundStyle(thermalColor)
@@ -43,22 +44,30 @@ struct HUDView: View {
 
     /// Padded to three columns. The font is monospaced, so 3% and 100% occupy
     /// the same width and the pill never resizes as the numbers move.
-    private func readout(_ label: String, percent: Double,
-                         warm: Double, hot: Double) -> some View {
+    private func readout(_ label: String, percent: Double, tint: Color) -> some View {
         HStack(spacing: 5) {
             Text(label).foregroundStyle(.secondary)
             Text(String(format: "%3d%%", Int((percent * 100).rounded())))
-                .foregroundStyle(tint(percent, warm: warm, hot: hot))
+                .foregroundStyle(tint)
         }
     }
 
-    /// Values warm as they climb so the pill reads at a glance, without
+    /// Processors warm as they climb, so the pill reads at a glance without
     /// anyone having to actually parse the digits.
-    private func tint(_ fraction: Double, warm: Double, hot: Double) -> Color {
+    private func usageTint(_ fraction: Double) -> Color {
         guard severityColors else { return resting }
-        if fraction >= hot { return .red }
-        if fraction >= warm { return .orange }
+        if fraction >= 0.90 { return .red }
+        if fraction >= 0.70 { return .orange }
         return resting
+    }
+
+    private var pressureTint: Color {
+        guard severityColors else { return resting }
+        switch vitals.memoryPressure {
+        case .normal:   return resting
+        case .warning:  return .orange
+        case .critical: return .red
+        }
     }
 
     private var resting: Color { .primary.opacity(0.85) }

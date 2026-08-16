@@ -56,6 +56,7 @@ if CommandLine.arguments.contains("--once") {
     print(s.tempC.map { "Die " + Temp.string($0, fahrenheit: Temp.preference, decimals: 1) }
           ?? "Die temp unavailable")
     print("Thermal \(s.thermal.label)")
+    print("Memory pressure \(s.memoryPressure.label)")
     exit(0)
 }
 

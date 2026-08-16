@@ -37,5 +37,23 @@ let tinyOK = pinned == CGPoint(x: 0, y: -500)
 if !tinyOK { failures += 1 }
 print("\(tinyOK ? "PASS" : "FAIL")  display narrower than the pill       -> (\(Int(pinned.x)),\(Int(pinned.y)))")
 
-print(failures == 0 ? "\nall 12 cases pass" : "\n\(failures) FAILED")
+
+// Memory pressure: the raw sysctl value maps to a verdict. 3 is not a level
+// macOS defines, and an unknown value must read as normal rather than invent
+// an alarm nobody can act on.
+func checkPressure(_ raw: Int32, _ expected: MemoryPressure, _ note: String) {
+    let got = MemoryPressure.from(raw)
+    let ok = got == expected
+    if !ok { failures += 1 }
+    print("\(ok ? "PASS" : "FAIL")  pressure \(String(raw).padding(toLength: 4, withPad: " ", startingAt: 0)) -> " +
+          "\(got.label.padding(toLength: 9, withPad: " ", startingAt: 0)) \(note)")
+}
+
+checkPressure(1, .normal,   "macOS: normal")
+checkPressure(2, .warning,  "macOS: warning")
+checkPressure(4, .critical, "macOS: critical")
+checkPressure(3, .normal,   "undefined, must not invent alarm")
+checkPressure(0, .normal,   "undefined, must not invent alarm")
+
+print(failures == 0 ? "\nall 17 cases pass" : "\n\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

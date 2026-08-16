@@ -36,10 +36,12 @@ the display it was living on gets unplugged.
 The menu bar item holds the rest:
 
 - **Appearance** — Auto, Light or Dark. Auto follows the system.
-- **Severity Colors** — values tint amber then red as they climb, so the pill
-  reads at a glance. CPU and GPU warm at 70% and go red at 90%; memory warms
-  earlier, at 75%, because a Mac near its memory ceiling is about to swap.
-  Temperature ignores this toggle and always tracks thermal pressure.
+- **Severity Colors** — values tint amber then red so the pill reads at a
+  glance. CPU and GPU warm at 70% and go red at 90%. Memory is different: it
+  tints by macOS's own pressure verdict, not by the percentage, because a Mac
+  deliberately fills RAM with caches and compressed pages. 71% used can be
+  perfectly healthy or can be thrashing, and the percentage alone cannot tell
+  you which. Temperature ignores this toggle and always tracks thermal pressure.
 - **Use Fahrenheit** — on by default, switch it off for Celsius.
 - **Show HUD**, **Reset Position**, **Launch at Login**.
 
@@ -49,7 +51,7 @@ To build without installing:
 ./build.sh
 ```
 
-`./build.sh test` runs the screen-clamping cases.
+`./build.sh test` runs the unit tests.
 
 The app icon is drawn in code by `tools/make-icon.swift`, each size rendered
 natively rather than downsampled, so it stays sharp at 16pt. `./build.sh icon`
@@ -71,6 +73,7 @@ temperature display works there.
 | --- | --- | --- |
 | CPU | `host_processor_info` tick deltas | Public API, stable |
 | Memory | `host_statistics64`, matching Activity Monitor's "used" | Public API, stable |
+| Memory pressure | `kern.memorystatus_vm_pressure_level` | Public sysctl, stable |
 | GPU | IORegistry `IOAccelerator` → `Device Utilization %` | Documented key, present on Intel and every Apple Silicon generation so far |
 | Thermal pressure | `ProcessInfo.thermalState` | Public API, stable |
 | Die temperature | `IOHIDEventSystem`, resolved with `dlopen` | Private, best effort |
