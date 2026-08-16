@@ -5,12 +5,16 @@ temperature, and a throttle warning, in one always-on-top pill you can park
 anywhere on screen.
 
 ```
-CPU 26%   GPU 6%   RAM 77%   43°C
+CPU  26%   GPU   6%   RAM  77%   110°F
 ```
 
-No dock icon, one menu bar item, about 400 lines of Swift. Builds with the
+No dock icon, one menu bar item, about 450 lines of Swift. Builds with the
 Xcode Command Line Tools alone, so you do not need a 12 GB Xcode install to
 compile it.
+
+Every number is padded to a fixed width in a monospaced face, so the pill holds
+its size as the readings move. A monitor that jitters in the corner of your eye
+is worse than no monitor.
 
 ## Why another system monitor
 
@@ -31,14 +35,21 @@ excellent and does far more than this.
 ```
 
 That builds `Redline.app`, copies it to `/Applications`, and launches it. Drag the
-pill wherever you want it; the position is remembered. Turn on **Launch at
-Login** from the menu bar item.
+pill wherever you want it; the position is remembered.
+
+The menu bar item holds the rest: **Show HUD**, **Reset Position**, **Use
+Fahrenheit**, and **Launch at Login**. Units default to whatever your region
+uses and the toggle overrides it.
 
 To build without installing:
 
 ```
 ./build.sh
 ```
+
+The app icon is drawn in code by `tools/make-icon.swift`, each size rendered
+natively rather than downsampled, so it stays sharp at 16pt. `./build.sh icon`
+redraws `Resources/Redline.icns`.
 
 ## Command line
 

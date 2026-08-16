@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HUDView: View {
     @ObservedObject var sampler: Sampler
+    @AppStorage(Temp.key) private var fahrenheit = Temp.systemDefault
 
     private var vitals: Sample { sampler.sample }
 
@@ -13,7 +14,7 @@ struct HUDView: View {
             }
             readout("RAM", percent: vitals.ram)
             if let temp = vitals.tempC {
-                Text("\(Int(temp.rounded()))°C")
+                Text(Temp.string(temp, fahrenheit: fahrenheit))
                     .foregroundStyle(thermalColor)
             }
             if vitals.thermal != .nominal {
@@ -37,10 +38,12 @@ struct HUDView: View {
         .fixedSize()
     }
 
+    /// Padded to three columns. The font is monospaced, so 3% and 100% occupy
+    /// the same width and the pill never resizes as the numbers move.
     private func readout(_ label: String, percent: Double) -> some View {
         HStack(spacing: 5) {
             Text(label).foregroundStyle(.secondary)
-            Text("\(Int((percent * 100).rounded()))%")
+            Text(String(format: "%3d%%", Int((percent * 100).rounded())))
         }
     }
 

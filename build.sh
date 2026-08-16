@@ -2,6 +2,7 @@
 # Builds Redline.app. Needs only the Xcode Command Line Tools, no full Xcode.
 #   ./build.sh            build into ./build
 #   ./build.sh install    build, then move it to /Applications and launch it
+#   ./build.sh icon       redraw Resources/Redline.icns from tools/make-icon.swift
 set -euo pipefail
 
 NAME="Redline"
@@ -10,6 +11,11 @@ VERSION="1.0"
 
 cd "$(dirname "$0")"
 APP="build/$NAME.app"
+
+if [[ "${1:-}" == "icon" ]]; then
+  swift tools/make-icon.swift
+  exit 0
+fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -20,12 +26,16 @@ swiftc -O \
   Sources/*.swift \
   -o "$APP/Contents/MacOS/$NAME"
 
+cp "Resources/$NAME.icns" "$APP/Contents/Resources/$NAME.icns"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>$NAME</string>
+  <key>CFBundleIconFile</key><string>$NAME</string>
+  <key>CFBundleIconName</key><string>$NAME</string>
   <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
   <key>CFBundleName</key><string>$NAME</string>
   <key>CFBundlePackageType</key><string>APPL</string>

@@ -3,6 +3,9 @@ import Combine
 import ServiceManagement
 import SwiftUI
 
+// Fahrenheit or Celsius follows the region until the menu says otherwise.
+UserDefaults.standard.register(defaults: [Temp.key: Temp.systemDefault])
+
 // `redline --sensors` dumps every temperature sensor this Mac exposes and exits.
 // Run it on a new machine to confirm the readings survived the move.
 if CommandLine.arguments.contains("--sensors") {
@@ -12,7 +15,8 @@ if CommandLine.arguments.contains("--sensors") {
         print("The HUD will drop the temperature and fall back to thermal state.")
     } else {
         for reading in readings {
-            print(String(format: "%6.1f°C  %@", reading.celsius, reading.name))
+            let temp = Temp.string(reading.celsius, fahrenheit: Temp.preference, decimals: 1)
+            print(String(format: "%8@  %@", temp as NSString, reading.name))
         }
     }
     exit(0)
@@ -28,7 +32,8 @@ if CommandLine.arguments.contains("--once") {
     print(String(format: "CPU %.1f%%", s.cpu * 100))
     print(s.gpu.map { String(format: "GPU %.1f%%", $0 * 100) } ?? "GPU unavailable")
     print(String(format: "RAM %.1f%% (%.2f GB)", s.ram * 100, s.ramUsedGB))
-    print(s.tempC.map { String(format: "Die %.1f°C", $0) } ?? "Die temp unavailable")
+    print(s.tempC.map { "Die " + Temp.string($0, fahrenheit: Temp.preference, decimals: 1) }
+          ?? "Die temp unavailable")
     print("Thermal \(s.thermal.label)")
     exit(0)
 }
@@ -120,6 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Show HUD", action: #selector(toggleHUD), keyEquivalent: "")
         menu.addItem(withTitle: "Reset Position", action: #selector(resetPosition), keyEquivalent: "")
+        menu.addItem(withTitle: "Use Fahrenheit", action: #selector(toggleUnits), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Launch at Login", action: #selector(toggleLoginItem), keyEquivalent: "")
         menu.addItem(.separator())
@@ -139,6 +145,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !hudVisible { toggleHUD() }
     }
 
+    @objc private func toggleUnits() {
+        UserDefaults.standard.set(!Temp.preference, forKey: Temp.key)
+        resizeToFit()
+    }
+
     @objc private func toggleLoginItem() {
         let service = SMAppService.mainApp
         do {
@@ -156,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTitle: "Show HUD")?.state = hudVisible ? .on : .off
+        menu.item(withTitle: "Use Fahrenheit")?.state = Temp.preference ? .on : .off
         menu.item(withTitle: "Launch at Login")?.state =
             SMAppService.mainApp.status == .enabled ? .on : .off
     }

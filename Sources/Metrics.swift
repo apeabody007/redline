@@ -13,6 +13,22 @@ struct Sample {
     var thermal: ProcessInfo.ThermalState = .nominal
 }
 
+enum Temp {
+    static let key = "fahrenheit"
+
+    /// Sensors report Celsius. Which one a person wants to read is a locale
+    /// question, so default to the region's system and let the menu override.
+    static var systemDefault: Bool { Locale.current.measurementSystem == .us }
+    static var preference: Bool { UserDefaults.standard.bool(forKey: key) }
+
+    /// Right-aligned in a fixed column so 99°F and 100°F are the same width.
+    static func string(_ celsius: Double, fahrenheit: Bool, decimals: Int = 0) -> String {
+        let value = fahrenheit ? celsius * 9 / 5 + 32 : celsius
+        let width = decimals > 0 ? decimals + 4 : 3
+        return String(format: "%\(width).\(decimals)f°\(fahrenheit ? "F" : "C")", value)
+    }
+}
+
 extension ProcessInfo.ThermalState {
     var label: String {
         switch self {
