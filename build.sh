@@ -17,6 +17,15 @@ if [[ "${1:-}" == "icon" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "test" ]]; then
+  mkdir -p build/tests
+  # The test file holds top-level code, so it has to be named main.swift.
+  cp Tests/ClampTests.swift build/tests/main.swift
+  swiftc -O Sources/Metrics.swift Sources/Sensors.swift build/tests/main.swift \
+    -o build/tests/clamp
+  exec build/tests/clamp
+fi
+
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 

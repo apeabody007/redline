@@ -47,15 +47,22 @@ warning.
 That builds `Redline.app`, copies it to `/Applications`, and launches it. Drag the
 pill wherever you want it; the position is remembered.
 
+The pill can be dragged anywhere on any display but not off one: it stops at
+the edges of the usable screen area, so no part of it can end up under the menu
+bar, behind the Dock, or past a corner. Unplug a display it was living on and it
+walks itself back onto a screen that still exists.
+
 The menu bar item holds the rest: **Show HUD**, **Reset Position**, **Use
-Fahrenheit**, and **Launch at Login**. Units default to whatever your region
-uses and the toggle overrides it.
+Fahrenheit**, and **Launch at Login**. Temperature reads in Fahrenheit by
+default; the toggle switches it to Celsius.
 
 To build without installing:
 
 ```
 ./build.sh
 ```
+
+`./build.sh test` runs the screen-clamping cases.
 
 The app icon is drawn in code by `tools/make-icon.swift`, each size rendered
 natively rather than downsampled, so it stays sharp at 16pt. `./build.sh icon`

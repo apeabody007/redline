@@ -2,7 +2,7 @@ import SwiftUI
 
 struct HUDView: View {
     @ObservedObject var sampler: Sampler
-    @AppStorage(Temp.key) private var fahrenheit = Temp.systemDefault
+    @AppStorage(Temp.key) private var fahrenheit = Temp.defaultsToFahrenheit
 
     private var vitals: Sample { sampler.sample }
 

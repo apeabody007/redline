@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import IOKit
 
@@ -13,12 +14,23 @@ struct Sample {
     var thermal: ProcessInfo.ThermalState = .nominal
 }
 
+/// Slides `frame` until it sits entirely inside `bounds`. If `bounds` is the
+/// smaller of the two the frame is pinned to its origin corner, which is the
+/// only sane answer and keeps the result deterministic.
+func clamped(_ frame: CGRect, into bounds: CGRect) -> CGRect {
+    let rightmost: CGFloat = max(bounds.maxX - frame.size.width, bounds.minX)
+    let topmost: CGFloat = max(bounds.maxY - frame.size.height, bounds.minY)
+    let x: CGFloat = min(max(frame.origin.x, bounds.minX), rightmost)
+    let y: CGFloat = min(max(frame.origin.y, bounds.minY), topmost)
+    return CGRect(origin: CGPoint(x: x, y: y), size: frame.size)
+}
+
 enum Temp {
     static let key = "fahrenheit"
 
-    /// Sensors report Celsius. Which one a person wants to read is a locale
-    /// question, so default to the region's system and let the menu override.
-    static var systemDefault: Bool { Locale.current.measurementSystem == .us }
+    /// Sensors report Celsius. Fahrenheit is the default because that is what
+    /// this was built for; the menu switches it in one click.
+    static let defaultsToFahrenheit = true
     static var preference: Bool { UserDefaults.standard.bool(forKey: key) }
 
     /// Right-aligned in a fixed column so 99°F and 100°F are the same width.

@@ -3,8 +3,8 @@ import Combine
 import ServiceManagement
 import SwiftUI
 
-// Fahrenheit or Celsius follows the region until the menu says otherwise.
-UserDefaults.standard.register(defaults: [Temp.key: Temp.systemDefault])
+// Fahrenheit unless the menu says otherwise.
+UserDefaults.standard.register(defaults: [Temp.key: Temp.defaultsToFahrenheit])
 
 // `redline --sensors` dumps every temperature sensor this Mac exposes and exits.
 // Run it on a new machine to confirm the readings survived the move.
@@ -52,7 +52,42 @@ final class HUDPanel: NSPanel {
         isMovableByWindowBackground = true
         hidesOnDeactivate = false
         contentView = content
+
+        // Dragging is free but bounded. These fire continuously through a drag
+        // and again when a display is added or removed, so the pill cannot be
+        // pushed under the menu bar, behind the Dock, or off an edge, and it
+        // cannot be stranded on a monitor that just got unplugged.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(keepOnScreen),
+            name: NSWindow.didMoveNotification, object: self)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(keepOnScreen),
+            name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
+
+    @objc func keepOnScreen() {
+        guard !clamping, let bounds = homeScreen()?.visibleFrame else { return }
+        let wanted = clamped(frame, into: bounds)
+        guard wanted.origin != frame.origin else { return }
+
+        clamping = true
+        setFrameOrigin(wanted.origin)
+        clamping = false
+    }
+
+    /// The screen the pill is on: the one under its center while dragging, or
+    /// whichever it overlaps most once it has been pushed past an edge.
+    private func homeScreen() -> NSScreen? {
+        let center = NSPoint(x: frame.midX, y: frame.midY)
+        if let under = NSScreen.screens.first(where: { $0.frame.contains(center) }) { return under }
+        let overlapping = NSScreen.screens.max {
+            let a = $0.frame.intersection(frame), b = $1.frame.intersection(frame)
+            return a.width * a.height < b.width * b.height
+        }
+        return overlapping ?? NSScreen.main
+    }
+
+    private var clamping = false
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -100,6 +135,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         frame.origin.x -= size.width - frame.width
         frame.size = size
         panel.setFrame(frame, display: true)
+        // Growing leftward can walk the pill past the left edge.
+        panel.keepOnScreen()
     }
 
     private func isOnAScreen(_ frame: NSRect) -> Bool {
