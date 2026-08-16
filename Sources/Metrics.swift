@@ -14,15 +14,30 @@ struct Sample {
     var thermal: ProcessInfo.ThermalState = .nominal
 }
 
-/// Slides `frame` until it sits entirely inside `bounds`. If `bounds` is the
-/// smaller of the two the frame is pinned to its origin corner, which is the
-/// only sane answer and keeps the result deterministic.
-func clamped(_ frame: CGRect, into bounds: CGRect) -> CGRect {
+/// Slides `frame` horizontally until it sits inside `bounds`.
+///
+/// Vertical position is deliberately left alone. Parking the pill up in the
+/// menu bar or down over the Dock are both places you might genuinely want it,
+/// and it draws above them, so it stays readable. Only the side edges actually
+/// cut readings off. If `bounds` is narrower than the frame it pins to the left
+/// edge, which keeps the result deterministic.
+func clampedHorizontally(_ frame: CGRect, into bounds: CGRect) -> CGRect {
     let rightmost: CGFloat = max(bounds.maxX - frame.size.width, bounds.minX)
-    let topmost: CGFloat = max(bounds.maxY - frame.size.height, bounds.minY)
     let x: CGFloat = min(max(frame.origin.x, bounds.minX), rightmost)
-    let y: CGFloat = min(max(frame.origin.y, bounds.minY), topmost)
-    return CGRect(origin: CGPoint(x: x, y: y), size: frame.size)
+    return CGRect(origin: CGPoint(x: x, y: frame.origin.y), size: frame.size)
+}
+
+enum Appearance: String, CaseIterable {
+    case auto, light, dark
+
+    static let key = "appearance"
+    static let severityKey = "severityColors"
+
+    var title: String { rawValue.capitalized }
+
+    static var current: Appearance {
+        UserDefaults.standard.string(forKey: key).flatMap(Appearance.init) ?? .auto
+    }
 }
 
 enum Temp {

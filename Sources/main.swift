@@ -3,8 +3,9 @@ import Combine
 import ServiceManagement
 import SwiftUI
 
-// Fahrenheit unless the menu says otherwise.
-UserDefaults.standard.register(defaults: [Temp.key: Temp.defaultsToFahrenheit])
+// Fahrenheit and severity colors unless the menu says otherwise.
+UserDefaults.standard.register(defaults: [Temp.key: Temp.defaultsToFahrenheit,
+                                          Appearance.severityKey: true])
 
 // `redline --sensors` dumps every temperature sensor this Mac exposes and exits.
 // Run it on a new machine to confirm the readings survived the move.
@@ -65,14 +66,31 @@ final class HUDPanel: NSPanel {
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
 
+    /// Bounded by the display itself, not the usable area, and only side to
+    /// side. Vertical is free, so the pill can sit in the menu bar or over the
+    /// Dock; it draws above both.
     @objc func keepOnScreen() {
-        guard !clamping, let bounds = homeScreen()?.visibleFrame else { return }
-        let wanted = clamped(frame, into: bounds)
-        guard wanted.origin != frame.origin else { return }
+        guard !clamping, let bounds = homeScreen()?.frame else { return }
+        let wanted = clampedHorizontally(frame, into: bounds)
+        if wanted.origin != frame.origin {
+            clamping = true
+            setFrameOrigin(wanted.origin)
+            clamping = false
+        }
+        UserDefaults.standard.set([frame.origin.x, frame.origin.y], forKey: Self.originKey)
+    }
 
-        clamping = true
-        setFrameOrigin(wanted.origin)
-        clamping = false
+    /// Position is persisted by hand rather than through setFrameAutosaveName.
+    /// AppKit stores the screen geometry alongside the frame and re-derives the
+    /// origin on restore, which shaved 5pt off y every launch and walked the
+    /// pill down the screen.
+    static let originKey = "hudOrigin"
+
+    func restoreOrigin() -> Bool {
+        guard let saved = UserDefaults.standard.array(forKey: Self.originKey) as? [Double],
+              saved.count == 2 else { return false }
+        setFrameOrigin(NSPoint(x: saved[0], y: saved[1]))
+        return true
     }
 
     /// The screen the pill is on: the one under its center while dragging, or
@@ -108,14 +126,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         hosting = NSHostingView(rootView: HUDView(sampler: sampler))
         panel = HUDPanel(content: hosting)
-        panel.setFrameAutosaveName("RedlineHUD")
+        // Size from the content first, then place it, so restoring an exact
+        // saved origin is not undone by the resize nudging x.
         resizeToFit()
+        if !panel.restoreOrigin() { placeAtTopCenter() }
         // A position saved on another display, or on this Mac before it was
         // plugged into a different one, can restore off-screen. Only honour it
         // if the pill would actually be visible.
         if !isOnAScreen(panel.frame) { placeAtTopCenter() }
+        panel.keepOnScreen()
 
         buildStatusItem()
+        applyAppearance()
 
         // The pill grows and shrinks as readings appear, so keep the window
         // glued to the content's natural size.
@@ -141,7 +163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func isOnAScreen(_ frame: NSRect) -> Bool {
         let center = NSPoint(x: frame.midX, y: frame.midY)
-        return NSScreen.screens.contains { $0.visibleFrame.contains(center) }
+        return NSScreen.screens.contains { $0.frame.contains(center) }
     }
 
     private func placeAtTopCenter() {
@@ -162,6 +184,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Show HUD", action: #selector(toggleHUD), keyEquivalent: "")
         menu.addItem(withTitle: "Reset Position", action: #selector(resetPosition), keyEquivalent: "")
+        menu.addItem(.separator())
+
+        let appearanceItem = NSMenuItem(title: "Appearance", action: nil, keyEquivalent: "")
+        let appearanceMenu = NSMenu()
+        for mode in Appearance.allCases {
+            let item = NSMenuItem(title: mode.title, action: #selector(setAppearance(_:)),
+                                  keyEquivalent: "")
+            item.representedObject = mode.rawValue
+            item.target = self
+            appearanceMenu.addItem(item)
+        }
+        appearanceItem.submenu = appearanceMenu
+        menu.addItem(appearanceItem)
+
+        menu.addItem(withTitle: "Severity Colors", action: #selector(toggleSeverity), keyEquivalent: "")
         menu.addItem(withTitle: "Use Fahrenheit", action: #selector(toggleUnits), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Launch at Login", action: #selector(toggleLoginItem), keyEquivalent: "")
@@ -187,6 +224,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         resizeToFit()
     }
 
+    @objc private func toggleSeverity() {
+        let on = UserDefaults.standard.bool(forKey: Appearance.severityKey)
+        UserDefaults.standard.set(!on, forKey: Appearance.severityKey)
+    }
+
+    @objc private func setAppearance(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String else { return }
+        UserDefaults.standard.set(raw, forKey: Appearance.key)
+        applyAppearance()
+    }
+
+    /// Forcing the panel's appearance is what flips the material and the text
+    /// colors; Auto leaves it nil so the pill follows the system.
+    private func applyAppearance() {
+        switch Appearance.current {
+        case .auto:  panel.appearance = nil
+        case .light: panel.appearance = NSAppearance(named: .aqua)
+        case .dark:  panel.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+
     @objc private func toggleLoginItem() {
         let service = SMAppService.mainApp
         do {
@@ -205,8 +263,15 @@ extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTitle: "Show HUD")?.state = hudVisible ? .on : .off
         menu.item(withTitle: "Use Fahrenheit")?.state = Temp.preference ? .on : .off
+        menu.item(withTitle: "Severity Colors")?.state =
+            UserDefaults.standard.bool(forKey: Appearance.severityKey) ? .on : .off
         menu.item(withTitle: "Launch at Login")?.state =
             SMAppService.mainApp.status == .enabled ? .on : .off
+
+        for item in menu.item(withTitle: "Appearance")?.submenu?.items ?? [] {
+            item.state = (item.representedObject as? String) == Appearance.current.rawValue
+                ? .on : .off
+        }
     }
 }
 

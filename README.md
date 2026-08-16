@@ -28,14 +28,20 @@ is worse than no monitor.
 That builds `Redline.app`, copies it to `/Applications`, and launches it. Drag the
 pill wherever you want it; the position is remembered.
 
-The pill can be dragged anywhere on any display but not off one: it stops at
-the edges of the usable screen area, so no part of it can end up under the menu
-bar, behind the Dock, or past a corner. Unplug a display it was living on and it
-walks itself back onto a screen that still exists.
+Drag it anywhere, including up into the menu bar or down over the Dock, since
+it draws above both. It is held to the left and right edges of the display so
+the readings cannot be cut off, and it walks itself back onto a real screen if
+the display it was living on gets unplugged.
 
-The menu bar item holds the rest: **Show HUD**, **Reset Position**, **Use
-Fahrenheit**, and **Launch at Login**. Temperature reads in Fahrenheit by
-default; the toggle switches it to Celsius.
+The menu bar item holds the rest:
+
+- **Appearance** — Auto, Light or Dark. Auto follows the system.
+- **Severity Colors** — values tint amber then red as they climb, so the pill
+  reads at a glance. CPU and GPU warm at 70% and go red at 90%; memory warms
+  earlier, at 75%, because a Mac near its memory ceiling is about to swap.
+  Temperature ignores this toggle and always tracks thermal pressure.
+- **Use Fahrenheit** — on by default, switch it off for Celsius.
+- **Show HUD**, **Reset Position**, **Launch at Login**.
 
 To build without installing:
 
