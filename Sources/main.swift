@@ -203,7 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // next to its neighbours. 17pt matches them.
         let icon = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent",
                            accessibilityDescription: "Redline")?
-            .withSymbolConfiguration(.init(pointSize: 17, weight: .regular))
+            .withSymbolConfiguration(.init(pointSize: 16, weight: .regular))
         icon?.isTemplate = true
         statusItem.button?.image = icon
 
