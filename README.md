@@ -19,25 +19,6 @@ Every number is padded to a fixed width in a monospaced face, so the pill holds
 its size as the readings move. A monitor that jitters in the corner of your eye
 is worse than no monitor.
 
-## Why another system monitor
-
-Because the interesting number is not the temperature, it is whether the
-machine is quietly slowing down. macOS reports thermal pressure through
-`ProcessInfo.thermalState`, and sustained load on a fanless Mac will move it
-long before anything feels wrong. Redline puts a `WARM` or `THROTTLE` tag in the
-pill the moment that happens, so a long compile or a local model run that has
-started down-clocking is visible instead of inferred.
-
-That matters most on the fanless Macs. An M-series Air will hold peak speed for
-five to fifteen minutes of sustained load and then quietly down-clock, and
-nothing in the system tells you it happened. A long compile or a local LLM run
-just gets slower.
-
-If you want menu bar graphs, history, fan control and per-process breakdowns,
-[Stats](https://github.com/exelban/stats) is excellent and free, and iStat Menus
-is the polished paid option. Redline is deliberately one line of text and one
-warning.
-
 ## Install
 
 ```
