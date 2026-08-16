@@ -1,8 +1,13 @@
+<img src="docs/icon.png" width="128" alt="Redline">
+
 # Redline
 
-A floating vitals readout for Apple Silicon Macs. CPU, GPU, memory, die
-temperature, and a throttle warning, in one always-on-top pill you can park
-anywhere on screen.
+**A free, open source system monitor for Apple Silicon Macs that tells you when
+your Mac is throttling.**
+
+CPU, GPU, memory usage and die temperature in one always-on-top pill you can
+park anywhere on screen, plus a throttle warning the moment macOS reports
+thermal pressure.
 
 ```
 CPU  26%   GPU   6%   RAM  77%   110°F
@@ -25,8 +30,15 @@ long before anything feels wrong. Redline puts a `WARM` or `THROTTLE` tag in the
 pill the moment that happens, so a long compile or a local model run that has
 started down-clocking is visible instead of inferred.
 
-If you just want menu bar graphs, [Stats](https://github.com/exelban/stats) is
-excellent and does far more than this.
+That matters most on the fanless Macs. An M-series Air will hold peak speed for
+five to fifteen minutes of sustained load and then quietly down-clock, and
+nothing in the system tells you it happened. A long compile or a local LLM run
+just gets slower.
+
+If you want menu bar graphs, history, fan control and per-process breakdowns,
+[Stats](https://github.com/exelban/stats) is excellent and free, and iStat Menus
+is the polished paid option. Redline is deliberately one line of text and one
+warning.
 
 ## Install
 
