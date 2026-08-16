@@ -200,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         // The default symbol size renders noticeably smaller than the custom
         // icons most menu bar apps ship, which leaves Redline looking shrunken
-        // next to its neighbours. 17pt matches them.
+        // next to its neighbours. 16pt sits with them without overpowering.
         let icon = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent",
                            accessibilityDescription: "Redline")?
             .withSymbolConfiguration(.init(pointSize: 16, weight: .regular))
