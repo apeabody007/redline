@@ -22,10 +22,27 @@ final class HoverView: NSView {
                                   owner: self)
         addTrackingArea(area)
         tracking = area
+
+        // A tracking area only fires when the pointer crosses its edge. If the
+        // pointer is already inside when the area is installed, which is what
+        // happens when the app launches under the cursor, hover would stay dead
+        // until you moved away and came back.
+        if let window {
+            let local = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+            report(bounds.contains(local))
+        }
     }
 
-    override func mouseEntered(with event: NSEvent) { onHover?(true) }
-    override func mouseExited(with event: NSEvent) { onHover?(false) }
+    override func mouseEntered(with event: NSEvent) { report(true) }
+    override func mouseExited(with event: NSEvent) { report(false) }
+
+    private var isInside = false
+
+    private func report(_ inside: Bool) {
+        guard inside != isInside else { return }
+        isInside = inside
+        onHover?(inside)
+    }
 }
 
 /// The panel that appears on hover. One panel for the whole pill rather than a
@@ -41,6 +58,11 @@ struct DetailView: View {
     @AppStorage(Temp.key) private var fahrenheit = Temp.defaultsToFahrenheit
 
     private var vitals: Sample { sampler.sample }
+
+    /// Wide enough for "Thermal", the longest label. Every row shares it so
+    /// the left edge lines up, and a Spacer is deliberately not used: it
+    /// competes with the text for width and squeezes it into wrapping.
+    private static let labelWidth: CGFloat = 50
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -80,15 +102,15 @@ struct DetailView: View {
         HStack(spacing: 8) {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 32, alignment: .leading)
+                .lineLimit(1)
+                .frame(width: Self.labelWidth, alignment: .leading)
             Text(value)
                 .frame(width: 46, alignment: .trailing)
                 .monospacedDigit()
             Text(note)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -98,11 +120,16 @@ struct DetailView: View {
         HStack(alignment: .top, spacing: 8) {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 32, alignment: .leading)
+                .lineLimit(1)
+                .frame(width: Self.labelWidth, alignment: .leading)
             Text(text)
                 .foregroundStyle(tint)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+                .lineLimit(1)
+                // "serious, chip is down-clocking" is the longest of these and
+                // only appears under sustained load, so it shrinks slightly
+                // rather than risking a truncated verdict nobody can read.
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.system(size: 10, weight: .medium, design: .monospaced))
     }
@@ -121,7 +148,7 @@ struct DetailView: View {
     private var memoryVerdict: String {
         switch vitals.memoryPressure {
         case .normal:   return "pressure normal, healthy"
-        case .warning:  return "pressure warning, starting to struggle"
+        case .warning:  return "pressure warning, straining"
         case .critical: return "pressure critical, thrashing"
         }
     }
