@@ -31,82 +31,126 @@ final class HoverView: NSView {
 /// The panel that appears on hover. One panel for the whole pill rather than a
 /// tooltip per number: the readings are 30pt wide, and asking someone to aim at
 /// "71%" to learn what it means is worse than showing everything at once.
+///
+/// It is pinned to the pill's exact width so the two read as one object rather
+/// than as a box that happened to open near another box.
 struct DetailView: View {
     @ObservedObject var sampler: Sampler
+    let width: CGFloat
+
     @AppStorage(Temp.key) private var fahrenheit = Temp.defaultsToFahrenheit
 
     private var vitals: Sample { sampler.sample }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 6) {
             row("CPU", percent(vitals.cpu),
-                "across \(ProcessInfo.processInfo.processorCount) cores")
+                "\(ProcessInfo.processInfo.processorCount) cores")
             if let gpu = vitals.gpu {
-                row("GPU", percent(gpu), "graphics utilization")
+                row("GPU", percent(gpu), "graphics")
             }
-            row("RAM", percent(vitals.ram), memoryNote)
+            row("RAM", percent(vitals.ram), memoryDetail)
             if let temp = vitals.tempC {
-                row("Temp", Temp.string(temp, fahrenheit: fahrenheit).trimmingCharacters(in: .whitespaces),
-                    "hottest die sensor")
+                row("Temp",
+                    Temp.string(temp, fahrenheit: fahrenheit)
+                        .trimmingCharacters(in: .whitespaces),
+                    "hottest die")
             }
 
-            Divider().opacity(0.3)
+            Divider().opacity(0.28).padding(.vertical, 1)
 
-            HStack(spacing: 6) {
-                Text("Thermal").foregroundStyle(.secondary)
-                Text(thermalNote)
-            }
-            .font(.system(size: 11))
+            verdict("Memory", memoryVerdict, tint: pressureTint)
+            verdict("Thermal", thermalVerdict, tint: thermalTint)
         }
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 11)
+        .frame(width: width, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
                     .strokeBorder(.white.opacity(0.10), lineWidth: 1))
         )
-        .fixedSize()
     }
 
+    /// Columns line up with the pill above: label, then the number, then what
+    /// the number is made of.
     private func row(_ label: String, _ value: String, _ note: String) -> some View {
         HStack(spacing: 8) {
             Text(label)
                 .foregroundStyle(.secondary)
-                .frame(width: 38, alignment: .leading)
+                .frame(width: 32, alignment: .leading)
             Text(value)
-                .frame(width: 52, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
                 .monospacedDigit()
             Text(note)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 0)
         }
-        .font(.system(size: 11, weight: .medium, design: .monospaced))
+    }
+
+    /// The two lines that actually answer "is this bad", given the full width
+    /// so they never have to be abbreviated.
+    private func verdict(_ label: String, _ text: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .foregroundStyle(.secondary)
+                .frame(width: 32, alignment: .leading)
+            Text(text)
+                .foregroundStyle(tint)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 10, weight: .medium, design: .monospaced))
     }
 
     private func percent(_ fraction: Double) -> String {
         "\(Int((fraction * 100).rounded()))%"
     }
 
-    /// The reason this panel exists. A percentage cannot tell you whether a Mac
-    /// is in trouble, because macOS deliberately fills RAM. This can.
-    private var memoryNote: String {
+    private var memoryDetail: String {
         let total = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
-        let verdict: String
-        switch vitals.memoryPressure {
-        case .normal:   verdict = "pressure normal"
-        case .warning:  verdict = "pressure WARNING"
-        case .critical: verdict = "pressure CRITICAL"
-        }
-        return String(format: "%.2f of %.0f GB used, %@", vitals.ramUsedGB, total, verdict)
+        return String(format: "%.2f of %.0f GB", vitals.ramUsedGB, total)
     }
 
-    private var thermalNote: String {
+    /// The reason this panel exists. A percentage cannot tell you whether a Mac
+    /// is in trouble, because macOS deliberately fills RAM. This can.
+    private var memoryVerdict: String {
+        switch vitals.memoryPressure {
+        case .normal:   return "pressure normal, healthy"
+        case .warning:  return "pressure warning, starting to struggle"
+        case .critical: return "pressure critical, thrashing"
+        }
+    }
+
+    private var thermalVerdict: String {
         switch vitals.thermal {
-        case .nominal:  return "nominal, running at full speed"
-        case .fair:     return "fair, warming up but not slowed"
-        case .serious:  return "serious, the chip is down-clocking"
+        case .nominal:  return "nominal, full speed"
+        case .fair:     return "fair, warm but not slowed"
+        case .serious:  return "serious, chip is down-clocking"
         case .critical: return "critical, heavily throttled"
         @unknown default: return "unknown"
+        }
+    }
+
+    private var pressureTint: Color {
+        switch vitals.memoryPressure {
+        case .normal:   return .primary.opacity(0.75)
+        case .warning:  return .orange
+        case .critical: return .red
+        }
+    }
+
+    private var thermalTint: Color {
+        switch vitals.thermal {
+        case .nominal:  return .primary.opacity(0.75)
+        case .fair:     return .yellow
+        case .serious:  return .orange
+        case .critical: return .red
+        @unknown default: return .primary
         }
     }
 }

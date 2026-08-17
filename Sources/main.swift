@@ -214,13 +214,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showDetail() {
         let panelToShow = detailPanel ?? makeDetailPanel()
         detailPanel = panelToShow
+        // Re-read the pill's width every time: it changes when the units are
+        // switched or the throttle tag appears, and the two should always be
+        // the same width.
+        detailHosting.rootView = DetailView(sampler: sampler, width: panel.frame.width)
         panelToShow.setContentSize(detailHosting.fittingSize)
         positionDetail(panelToShow)
         panelToShow.orderFrontRegardless()
     }
 
     private func makeDetailPanel() -> NSPanel {
-        detailHosting = NSHostingView(rootView: DetailView(sampler: sampler))
+        detailHosting = NSHostingView(rootView: DetailView(sampler: sampler,
+                                                          width: panel.frame.width))
         let new = NSPanel(contentRect: .zero,
                           styleMask: [.borderless, .nonactivatingPanel],
                           backing: .buffered, defer: false)
