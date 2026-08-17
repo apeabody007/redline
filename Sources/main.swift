@@ -73,6 +73,7 @@ final class HUDPanel: NSPanel {
         hasShadow = true
         isMovableByWindowBackground = true
         hidesOnDeactivate = false
+        acceptsMouseMovedEvents = true
         contentView = content
 
         // Dragging is free but bounded. These fire continuously through a drag
@@ -98,8 +99,15 @@ final class HUDPanel: NSPanel {
             setFrameOrigin(wanted.origin)
             clamping = false
         }
+        // Only persist once launch placement is done. The initial resize also
+        // moves the window, and saving then would overwrite the position we
+        // are about to restore with the panel's default origin.
+        guard persistsPosition else { return }
         UserDefaults.standard.set([frame.origin.x, frame.origin.y], forKey: Self.originKey)
     }
+
+    /// Set once the window has been put where it belongs at launch.
+    var persistsPosition = false
 
     /// Position is persisted by hand rather than through setFrameAutosaveName.
     /// AppKit stores the screen geometry alongside the frame and re-derives the
@@ -138,6 +146,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hosting: NSHostingView<HUDView>!
     private var statusItem: NSStatusItem!
     private var cancellable: AnyCancellable?
+    private var detailPanel: NSPanel?
+    private var detailHosting: NSHostingView<DetailView>!
+    private var hoverWork: DispatchWorkItem?
 
     private var hudVisible: Bool {
         get { UserDefaults.standard.object(forKey: "hudVisible") as? Bool ?? true }
@@ -146,7 +157,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         hosting = NSHostingView(rootView: HUDView(sampler: sampler))
-        panel = HUDPanel(content: hosting)
+
+        // The hosting view sits inside a hover tracker rather than being the
+        // content view itself, so the pill can report hover without SwiftUI
+        // needing to know anything about it.
+        let tracker = HoverView(frame: hosting.bounds)
+        tracker.autoresizingMask = [.width, .height]
+        hosting.autoresizingMask = [.width, .height]
+        tracker.addSubview(hosting)
+        tracker.onHover = { [weak self] inside in self?.hoverChanged(inside) }
+
+        panel = HUDPanel(content: tracker)
         // Size from the content first, then place it, so restoring an exact
         // saved origin is not undone by the resize nudging x.
         resizeToFit()
@@ -164,18 +185,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // glued to the content's natural size.
         cancellable = sampler.$sample
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.resizeToFit() }
+            .sink { [weak self] _ in
+                self?.resizeToFit()
+                // Only once the pill has its real width does moving it mean
+                // anything, so persistence starts here rather than at launch.
+                self?.panel.persistsPosition = true
+            }
 
         sampler.start()
         if hudVisible { panel.orderFrontRegardless() }
     }
 
+    // MARK: - Hover detail
+
+    /// Held back briefly so sweeping the cursor across the pill on the way
+    /// somewhere else does not flash a panel at you.
+    private func hoverChanged(_ inside: Bool) {
+        hoverWork?.cancel()
+        guard inside else {
+            detailPanel?.orderOut(nil)
+            return
+        }
+        let work = DispatchWorkItem { [weak self] in self?.showDetail() }
+        hoverWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    private func showDetail() {
+        let panelToShow = detailPanel ?? makeDetailPanel()
+        detailPanel = panelToShow
+        panelToShow.setContentSize(detailHosting.fittingSize)
+        positionDetail(panelToShow)
+        panelToShow.orderFrontRegardless()
+    }
+
+    private func makeDetailPanel() -> NSPanel {
+        detailHosting = NSHostingView(rootView: DetailView(sampler: sampler))
+        let new = NSPanel(contentRect: .zero,
+                          styleMask: [.borderless, .nonactivatingPanel],
+                          backing: .buffered, defer: false)
+        new.isFloatingPanel = true
+        new.level = .statusBar
+        new.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        new.isOpaque = false
+        new.backgroundColor = .clear
+        new.hasShadow = true
+        new.hidesOnDeactivate = false
+        // Never let the detail panel take the hover away from the pill, which
+        // would make it flicker itself in and out.
+        new.ignoresMouseEvents = true
+        new.appearance = panel.appearance
+        new.contentView = detailHosting
+        return new
+    }
+
+    /// Under the pill by default, flipped above it when there is no room, and
+    /// pulled back inside the display if it would hang off a side.
+    private func positionDetail(_ detail: NSPanel) {
+        let pill = panel.frame
+        let size = detail.frame.size
+        let screen = NSScreen.screens.first { $0.frame.intersects(pill) } ?? NSScreen.main
+        let bounds = screen?.frame ?? pill
+
+        var origin = NSPoint(x: pill.minX, y: pill.minY - size.height - 8)
+        if origin.y < bounds.minY { origin.y = pill.maxY + 8 }
+        origin.x = min(max(origin.x, bounds.minX + 4), bounds.maxX - size.width - 4)
+        detail.setFrameOrigin(origin)
+    }
+
     private func resizeToFit() {
         let size = hosting.fittingSize
         guard size.width > 0, size != panel.frame.size else { return }
-        // Grow leftward so the pill's right edge stays put.
+        // Grow leftward so the pill's right edge stays put, but not before the
+        // first real sample: the pill launches narrow, because it has no GPU or
+        // temperature reading yet, and anchoring the right edge through that
+        // first widening would walk the window left on every launch.
         var frame = panel.frame
-        frame.origin.x -= size.width - frame.width
+        if panel.persistsPosition {
+            frame.origin.x -= size.width - frame.width
+        }
         frame.size = size
         panel.setFrame(frame, display: true)
         // Growing leftward can walk the pill past the left edge.
@@ -270,6 +358,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .light: panel.appearance = NSAppearance(named: .aqua)
         case .dark:  panel.appearance = NSAppearance(named: .darkAqua)
         }
+        detailPanel?.appearance = panel.appearance
     }
 
     @objc private func toggleLoginItem() {

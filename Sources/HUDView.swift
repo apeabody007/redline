@@ -10,16 +10,20 @@ struct HUDView: View {
     var body: some View {
         HStack(spacing: 14) {
             readout("CPU", percent: vitals.cpu, tint: usageTint(vitals.cpu))
+                .help("Processor time across all \(ProcessInfo.processInfo.processorCount) cores")
             if let gpu = vitals.gpu {
                 readout("GPU", percent: gpu, tint: usageTint(gpu))
+                    .help("Graphics utilization")
             }
             // Memory is tinted by macOS's pressure verdict rather than by the
             // percentage. A Mac deliberately fills RAM, so 71% used might be
             // perfectly healthy or might be thrashing, and only the OS knows.
             readout("RAM", percent: vitals.ram, tint: pressureTint)
+                .help(memoryHelp)
             if let temp = vitals.tempC {
                 Text(Temp.string(temp, fahrenheit: fahrenheit))
                     .foregroundStyle(thermalColor)
+                    .help("Hottest die sensor. Thermal pressure: \(vitals.thermal.label)")
             }
             if vitals.thermal != .nominal {
                 Text(throttleLabel)
@@ -28,6 +32,7 @@ struct HUDView: View {
                     .padding(.vertical, 1)
                     .background(Capsule().fill(thermalColor.opacity(0.22)))
                     .foregroundStyle(thermalColor)
+                    .help(throttleHelp)
             }
         }
         .font(.system(size: 12, weight: .medium, design: .monospaced))
@@ -71,6 +76,28 @@ struct HUDView: View {
     }
 
     private var resting: Color { .primary.opacity(0.85) }
+
+    /// The percentage alone cannot say whether a Mac is in trouble, so the
+    /// tooltip spells out what it is made of and what macOS makes of it.
+    private var memoryHelp: String {
+        let total = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
+        let verdict: String
+        switch vitals.memoryPressure {
+        case .normal:   verdict = "normal, this is healthy"
+        case .warning:  verdict = "warning, the machine is starting to struggle"
+        case .critical: verdict = "critical, the machine is thrashing"
+        }
+        return String(format: "%.2f GB of %.0f GB in use, counting app memory, "
+                      + "wired and compressed.\nMemory pressure: %@",
+                      vitals.ramUsedGB, total, verdict)
+    }
+
+    private var throttleHelp: String {
+        vitals.thermal == .fair
+            ? "The machine is warming up. No slowdown yet."
+            : "macOS is reporting thermal pressure. The chip is down-clocking, "
+              + "so sustained work is running slower than it could."
+    }
 
     /// Temperature always tracks thermal pressure rather than the severity
     /// toggle. It is the reading the app exists for, so it is never muted.

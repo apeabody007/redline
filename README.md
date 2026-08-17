@@ -33,6 +33,11 @@ it draws above both. It is held to the left and right edges of the display so
 the readings cannot be cut off, and it walks itself back onto a real screen if
 the display it was living on gets unplugged.
 
+Hover the pill for the detail panel: what the memory figure is actually made
+of and what macOS makes of it, how many cores are behind the CPU number, and
+what the thermal state means in plain words. It appears below the pill, or
+above it when there is no room.
+
 The menu bar item holds the rest:
 
 - **Appearance** — Auto, Light or Dark. Auto follows the system.
