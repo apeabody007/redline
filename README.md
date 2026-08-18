@@ -22,6 +22,24 @@ is worse than no monitor.
 ## Install
 
 ```
+brew install apeabody007/tap/redline
+```
+
+Then link it where you can launch it:
+
+```
+ln -sfn /opt/homebrew/opt/redline/Redline.app /Applications/Redline.app
+open /Applications/Redline.app
+```
+
+Homebrew builds it from source on your machine rather than downloading a
+binary. That is deliberate: locally compiled code is never quarantined by
+Gatekeeper, so this needs no Developer ID certificate, and anyone who already
+has Homebrew has the Command Line Tools it compiles with.
+
+Or build it yourself from a clone:
+
+```
 ./build.sh install
 ```
 
