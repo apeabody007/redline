@@ -11,7 +11,7 @@ thermal pressure.
 
 <img src="docs/screenshot.png" width="700" alt="The Redline pill floating over a desktop, reading CPU 13%, GPU 11%, RAM 73%, 102°F">
 
-No dock icon, one menu bar item, about 650 lines of Swift. Builds with the
+No dock icon, one menu bar item, about 1,000 lines of Swift. Builds with the
 Xcode Command Line Tools alone, so you do not need a 12 GB Xcode install to
 compile it.
 
@@ -56,6 +56,8 @@ of and what macOS makes of it, how many cores are behind the CPU number, and
 what the thermal state means in plain words. It appears below the pill, or
 above it when there is no room.
 
+<img src="docs/hover-panel.png" width="400" alt="The hover panel, showing CPU 33% across 8 cores, GPU 100%, RAM 72% at 5.80 of 8 GB, Temp 115F, memory pressure normal and thermal nominal">
+
 The menu bar item holds the rest:
 
 - **Appearance** — Auto, Light or Dark. Auto follows the system.
@@ -68,27 +70,31 @@ The menu bar item holds the rest:
 - **Use Fahrenheit** — on by default, switch it off for Celsius.
 - **Show HUD**, **Reset Position**, **Launch at Login**.
 
-To build without installing:
-
-```
-./build.sh
-```
-
-`./build.sh test` runs the unit tests.
-
-The app icon is drawn in code by `tools/make-icon.swift`, each size rendered
-natively rather than downsampled, so it stays sharp at 16pt. `./build.sh icon`
-redraws `Resources/Redline.icns`.
-
 ## Command line
 
 ```
 redline --once       one reading, printed and exit
 redline --sensors    every temperature sensor this Mac exposes
+redline --help       usage
 ```
 
 `--sensors` is the one to run on a new machine. If it prints readings, the
 temperature display works there.
+
+## Building
+
+```
+./build.sh           build into ./build
+./build.sh install   build, copy to /Applications, launch it
+./build.sh test      run the unit tests
+./build.sh icon      redraw Resources/Redline.icns
+```
+
+Needs only the Xcode Command Line Tools. `tools/make-icon.swift` draws the app
+icon in code, rendering each size natively rather than downsampling one master,
+so it stays sharp at 16pt. `tools/preview-detail.swift` renders the hover panel
+to a PNG, which is how its layout gets checked without running the app and
+hovering it.
 
 ## How it reads the hardware
 
@@ -125,14 +131,28 @@ over the naive version that walked all 39 services every second.
 
 ## Uninstall
 
+If you installed with Homebrew:
+
+```
+brew uninstall redline
+rm -f /Applications/Redline.app
+```
+
+If you built it from a clone:
+
+```
+rm -rf /Applications/Redline.app
+```
+
+Then, either way:
+
 ```
 launchctl disable "gui/$(id -u)/dev.aaronpeabody.redline" 2>/dev/null
-rm -rf /Applications/Redline.app
 defaults delete dev.aaronpeabody.redline
 ```
 
-The middle line is the only one that matters if you never turned on Launch at
-Login. The last one clears the remembered position and menu settings.
+The first of those two only matters if you turned on Launch at Login. The
+second clears the remembered position and menu settings.
 
 ## Requirements
 
