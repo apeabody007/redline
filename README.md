@@ -21,6 +21,12 @@ is worse than no monitor.
 
 ## Install
 
+Download **Redline.dmg** from [the latest release](https://github.com/apeabody007/redline/releases/latest),
+open it, and drag Redline to Applications. It is signed and notarized by Apple,
+so it opens without any Gatekeeper warnings.
+
+Or with Homebrew:
+
 ```
 brew install apeabody007/tap/redline
 ```
@@ -127,10 +133,14 @@ Once a notarized DMG exists, the Homebrew tap can carry a cask instead of a
 formula, which installs into `/Applications` directly and removes the symlink
 step above.
 
-**This script is untested.** It was written on a machine with no certificate
-installed, so every step from `codesign` onward has never run. The preflight is
-deliberately loud and fails on missing setup rather than halfway through a
-notarization, but treat the first real run as a debugging session.
+Run for v1.1 and accepted by Apple on the first attempt. The hardened runtime
+does not interfere with the `dlopen` of IOKit, which was the step most likely to
+be rejected.
+
+If `security find-identity` shows zero identities right after installing a
+certificate, the usual cause is a missing Apple intermediate rather than
+anything wrong with the certificate. The leaf names its own intermediate in its
+AIA field, `certs.apple.com/devidg2.der` for a G2 Developer ID.
 
 ## How it reads the hardware
 
