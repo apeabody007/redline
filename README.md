@@ -151,8 +151,9 @@ calibration sensors, and takes the hottest die reading that remains. On a Mac
 where the lookup fails, the temperature is simply omitted and the throttle tag
 carries the signal on its own.
 
-That private lookup is also why this cannot ship on the Mac App Store, and why
-the build is ad-hoc signed rather than notarized.
+That private lookup is also why this cannot ship on the Mac App Store. It does
+not prevent notarization, which is a different process with different rules;
+see [Releasing a signed build](#releasing-a-signed-build).
 
 ## Cost of leaving it running
 
