@@ -96,6 +96,42 @@ so it stays sharp at 16pt. `tools/preview-detail.swift` renders the hover panel
 to a PNG, which is how its layout gets checked without running the app and
 hovering it.
 
+## Releasing a signed build
+
+Redline ships as source because a downloadable binary has to be notarized or
+Gatekeeper refuses to open it at all. `scripts/release.sh` does the whole
+signed, notarized, stapled DMG flow. It needs two pieces of one-time setup:
+
+1. A **Developer ID Application** certificate, free with an Apple Developer
+   membership. developer.apple.com/account, Certificates, +, then download the
+   `.cer` and double-click to install it.
+2. Stored notary credentials, using an app-specific password from
+   appleid.apple.com:
+
+```
+xcrun notarytool store-credentials redline-notary \
+  --apple-id <your-apple-id> --team-id <YOUR_TEAM_ID> --password <app-specific-password>
+```
+
+Then each release is:
+
+```
+./scripts/release.sh 1.2
+gh release upload v1.2 build/dist/Redline-1.2.dmg --clobber
+```
+
+Both `notarytool` and `stapler` ship with the Xcode Command Line Tools, so full
+Xcode is not required here either. The certificate is the only missing piece.
+
+Once a notarized DMG exists, the Homebrew tap can carry a cask instead of a
+formula, which installs into `/Applications` directly and removes the symlink
+step above.
+
+**This script is untested.** It was written on a machine with no certificate
+installed, so every step from `codesign` onward has never run. The preflight is
+deliberately loud and fails on missing setup rather than halfway through a
+notarization, but treat the first real run as a debugging session.
+
 ## How it reads the hardware
 
 | Metric | Source | Portable |
