@@ -25,32 +25,17 @@ Download **Redline.dmg** from [the latest release](https://github.com/apeabody00
 open it, and drag Redline to Applications. It is signed and notarized by Apple,
 so it opens without any Gatekeeper warnings.
 
-Or with Homebrew:
-
-```
-brew install apeabody007/tap/redline
-```
-
-Then link it where you can launch it:
-
-```
-ln -sfn /opt/homebrew/opt/redline/Redline.app /Applications/Redline.app
-open /Applications/Redline.app
-```
-
-Homebrew builds it from source on your machine rather than downloading a
-binary. That is deliberate: locally compiled code is never quarantined by
-Gatekeeper, so this needs no Developer ID certificate, and anyone who already
-has Homebrew has the Command Line Tools it compiles with.
-
 Or build it yourself from a clone:
 
 ```
 ./build.sh install
 ```
 
-That builds `Redline.app`, copies it to `/Applications`, and launches it. Drag the
-pill wherever you want it; the position is remembered.
+That builds `Redline.app`, copies it to `/Applications`, and launches it. Note
+that it ad-hoc signs, so it will replace a notarized copy with an unsigned one.
+That is fine for your own machine and not something to hand to anyone else.
+
+Drag the pill wherever you want it; the position is remembered.
 
 Drag it anywhere, including up into the menu bar or down over the Dock, since
 it draws above both. It is held to the left and right edges of the display so
@@ -128,10 +113,6 @@ gh release upload v1.2 build/dist/Redline-1.2.dmg --clobber
 
 Both `notarytool` and `stapler` ship with the Xcode Command Line Tools, so full
 Xcode is not required here either. The certificate is the only missing piece.
-
-Once a notarized DMG exists, the Homebrew tap can carry a cask instead of a
-formula, which installs into `/Applications` directly and removes the symlink
-step above.
 
 Run for v1.1 and accepted by Apple on the first attempt. The hardened runtime
 does not interfere with the `dlopen` of IOKit, which was the step most likely to
