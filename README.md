@@ -15,6 +15,9 @@ No dock icon, one menu bar item, about 1,000 lines of Swift. Builds with the
 Xcode Command Line Tools alone, so you do not need a 12 GB Xcode install to
 compile it.
 
+It is not another iStat. It shows four numbers and the one fact the others
+bury, that your Mac is throttling, and nothing else.
+
 Every number is padded to a fixed width in a monospaced face, so the pill holds
 its size as the readings move. A monitor that jitters in the corner of your eye
 is worse than no monitor.
@@ -35,12 +38,10 @@ That builds `Redline.app`, copies it to `/Applications`, and launches it. Note
 that it ad-hoc signs, so it will replace a notarized copy with an unsigned one.
 That is fine for your own machine and not something to hand to anyone else.
 
-Drag the pill wherever you want it; the position is remembered.
-
-Drag it anywhere, including up into the menu bar or down over the Dock, since
-it draws above both. It is held to the left and right edges of the display so
-the readings cannot be cut off, and it walks itself back onto a real screen if
-the display it was living on gets unplugged.
+Drag the pill anywhere, including up into the menu bar or down over the Dock,
+since it draws above both. The position is remembered. It is held to the left
+and right edges of the display so the readings cannot be cut off, and it walks
+itself back onto a real screen if the display it was living on gets unplugged.
 
 Hover the pill for the detail panel: what the memory figure is actually made
 of and what macOS makes of it, how many cores are behind the CPU number, and
@@ -59,7 +60,7 @@ The menu bar item holds the rest:
   perfectly healthy or can be thrashing, and the percentage alone cannot tell
   you which. Temperature ignores this toggle and always tracks thermal pressure.
 - **Use Fahrenheit** — on by default, switch it off for Celsius.
-- **Show HUD**, **Reset Position**, **Launch at Login**.
+- **Launch at Login**, plus **Show HUD** and **Reset Position** if you lose it.
 
 ## Command line
 
@@ -87,41 +88,7 @@ so it stays sharp at 16pt. `tools/preview-detail.swift` renders the hover panel
 to a PNG, which is how its layout gets checked without running the app and
 hovering it.
 
-## Releasing a signed build
-
-Redline ships as source because a downloadable binary has to be notarized or
-Gatekeeper refuses to open it at all. `scripts/release.sh` does the whole
-signed, notarized, stapled DMG flow. It needs two pieces of one-time setup:
-
-1. A **Developer ID Application** certificate, free with an Apple Developer
-   membership. developer.apple.com/account, Certificates, +, then download the
-   `.cer` and double-click to install it.
-2. Stored notary credentials, using an app-specific password from
-   appleid.apple.com:
-
-```
-xcrun notarytool store-credentials redline-notary \
-  --apple-id <your-apple-id> --team-id <YOUR_TEAM_ID> --password <app-specific-password>
-```
-
-Then each release is:
-
-```
-./scripts/release.sh 1.2
-gh release upload v1.2 build/dist/Redline-1.2.dmg --clobber
-```
-
-Both `notarytool` and `stapler` ship with the Xcode Command Line Tools, so full
-Xcode is not required here either. The certificate is the only missing piece.
-
-Run for v1.1 and accepted by Apple on the first attempt. The hardened runtime
-does not interfere with the `dlopen` of IOKit, which was the step most likely to
-be rejected.
-
-If `security find-identity` shows zero identities right after installing a
-certificate, the usual cause is a missing Apple intermediate rather than
-anything wrong with the certificate. The leaf names its own intermediate in its
-AIA field, `certs.apple.com/devidg2.der` for a G2 Developer ID.
+Cutting a signed, notarized DMG is covered in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## How it reads the hardware
 
@@ -143,8 +110,7 @@ where the lookup fails, the temperature is simply omitted and the throttle tag
 carries the signal on its own.
 
 That private lookup is also why this cannot ship on the Mac App Store. It does
-not prevent notarization, which is a different process with different rules;
-see [Releasing a signed build](#releasing-a-signed-build).
+not prevent notarization, which is a different process with different rules.
 
 ## Cost of leaving it running
 
@@ -159,28 +125,14 @@ over the naive version that walked all 39 services every second.
 
 ## Uninstall
 
-If you installed with Homebrew:
-
-```
-brew uninstall redline
-rm -f /Applications/Redline.app
-```
-
-If you built it from a clone:
-
 ```
 rm -rf /Applications/Redline.app
-```
-
-Then, either way:
-
-```
 launchctl disable "gui/$(id -u)/dev.aaronpeabody.redline" 2>/dev/null
 defaults delete dev.aaronpeabody.redline
 ```
 
-The first of those two only matters if you turned on Launch at Login. The
-second clears the remembered position and menu settings.
+The second line only matters if you turned on Launch at Login. The third
+clears the remembered position and menu settings.
 
 ## Requirements
 
