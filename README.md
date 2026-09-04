@@ -52,14 +52,14 @@ above it when there is no room.
 
 The menu bar item holds the rest:
 
-- **Appearance** — Auto, Light or Dark. Auto follows the system.
-- **Severity Colors** — values tint amber then red so the pill reads at a
+- **Appearance**: Auto, Light or Dark. Auto follows the system.
+- **Severity Colors**: values tint amber then red so the pill reads at a
   glance. CPU and GPU warm at 70% and go red at 90%. Memory is different: it
   tints by macOS's own pressure verdict, not by the percentage, because a Mac
   deliberately fills RAM with caches and compressed pages. 71% used can be
   perfectly healthy or can be thrashing, and the percentage alone cannot tell
   you which. Temperature ignores this toggle and always tracks thermal pressure.
-- **Use Fahrenheit** — on by default, switch it off for Celsius.
+- **Use Fahrenheit**: on by default, switch it off for Celsius.
 - **Launch at Login**, plus **Show HUD** and **Reset Position** if you lose it.
 
 ## Command line
