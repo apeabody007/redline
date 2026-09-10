@@ -24,7 +24,7 @@ is worse than no monitor.
 
 ## Install
 
-Download **Redline.dmg** from [the latest release](https://github.com/apeabody007/redline/releases/latest),
+[Download **Redline.dmg**](https://github.com/apeabody007/redline/releases/latest/download/Redline.dmg),
 open it, and drag Redline to Applications. It is signed and notarized by Apple,
 so it opens without any Gatekeeper warnings.
 
