@@ -28,6 +28,17 @@ Download **Redline.dmg** from [the latest release](https://github.com/apeabody00
 open it, and drag Redline to Applications. It is signed and notarized by Apple,
 so it opens without any Gatekeeper warnings.
 
+Or with Homebrew:
+
+```
+brew trust apeabody007/tap
+brew install --cask apeabody007/tap/redline
+```
+
+The cask installs that same notarized dmg, so nothing is compiled on your
+machine. Homebrew 6 will not load a cask from a tap you have not trusted, which
+is what the first line is for.
+
 Or build it yourself from a clone:
 
 ```
