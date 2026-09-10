@@ -3,13 +3,8 @@
 #
 #   ./scripts/release.sh 1.2
 #
-# ---------------------------------------------------------------------------
-# UNTESTED. This was written on a Mac with no Developer ID certificate
-# installed, so every step from `codesign` onward has never actually run.
-# Treat the first real run as a debugging session rather than a release.
 # The preflight below is deliberately loud so it fails on the setup rather
 # than halfway through a notarization.
-# ---------------------------------------------------------------------------
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
