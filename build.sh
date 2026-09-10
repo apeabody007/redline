@@ -7,7 +7,7 @@ set -euo pipefail
 
 NAME="Redline"
 BUNDLE_ID="dev.aaronpeabody.redline"
-VERSION="1.0"
+VERSION="${VERSION:-1.1}"   # scripts/release.sh passes the release version in
 
 cd "$(dirname "$0")"
 APP="build/$NAME.app"
