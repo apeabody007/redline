@@ -19,7 +19,7 @@ Then each release is:
 
 ```
 ./scripts/release.sh 1.2
-gh release upload v1.2 build/dist/Redline-1.2.dmg --clobber
+gh release upload v1.2 build/dist/Redline.dmg --clobber
 ```
 
 Both `notarytool` and `stapler` ship with the Xcode Command Line Tools, so full
