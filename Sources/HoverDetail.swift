@@ -12,7 +12,18 @@ import SwiftUI
 /// is.
 final class HoverView: NSView {
     var onHover: ((Bool) -> Void)?
+
+    /// Set when the view is only there to watch the pointer, as it is when it
+    /// sits over the menu bar button, so clicks fall through to whatever is
+    /// underneath. Tracking areas fire either way; hit testing is what decides
+    /// who gets the click.
+    var clickThrough = false
+
     private var tracking: NSTrackingArea?
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        clickThrough ? nil : super.hitTest(point)
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()

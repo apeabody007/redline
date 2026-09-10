@@ -61,6 +61,13 @@ above it when there is no room.
 
 <img src="docs/hover-panel.png" width="400" alt="The hover panel, showing CPU 33% across 8 cores, GPU 100%, RAM 72% at 5.80 of 8 GB, Temp 115F, memory pressure normal and thermal nominal">
 
+Hover the menu bar icon instead and you get the last three minutes: a trace per
+reading, beside the number it belongs to. The pill can only ever tell you
+about this second, so a spike that has already passed is invisible to it. The
+traces are the shape of what just happened.
+
+<img src="docs/traces-panel.png" width="400" alt="The menu bar hover panel, showing sparkline traces for CPU at 15 percent, GPU at 9 percent with repeated spikes, RAM steady at 71 percent and Temp at 105F, over the last 1 minute 32 seconds">
+
 The menu bar item holds the rest:
 
 - **Appearance**: Auto, Light or Dark. Auto follows the system.

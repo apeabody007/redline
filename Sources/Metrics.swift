@@ -101,8 +101,26 @@ extension ProcessInfo.ThermalState {
     }
 }
 
+/// Appends to a fixed-length window of readings, dropping the oldest once it is
+/// full. A free function rather than a method on the sampler so the rule can be
+/// tested on its own, the way `clampedHorizontally` is.
+func appending<T>(_ value: T, to window: [T], limit: Int) -> [T] {
+    guard limit > 0 else { return [] }
+    var next = window
+    next.append(value)
+    if next.count > limit { next.removeFirst(next.count - limit) }
+    return next
+}
+
 final class Sampler: ObservableObject {
     @Published private(set) var sample = Sample()
+
+    /// The recent past, oldest first, so hovering the menu bar icon can show
+    /// where a reading has been and not only where it is.
+    @Published private(set) var history: [Sample] = []
+
+    /// Ticks are a second apart, so this is the last three minutes.
+    static let historyLimit = 180
 
     private var timer: Timer?
     private var prevTicks: (used: Double, total: Double)?
@@ -131,6 +149,7 @@ final class Sampler: ObservableObject {
         s.thermal = ProcessInfo.processInfo.thermalState
         s.memoryPressure = MemoryPressure.current
         sample = s
+        history = appending(s, to: history, limit: Self.historyLimit)
     }
 
     // MARK: - CPU

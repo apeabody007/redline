@@ -55,5 +55,22 @@ checkPressure(4, .critical, "macOS: critical")
 checkPressure(3, .normal,   "undefined, must not invent alarm")
 checkPressure(0, .normal,   "undefined, must not invent alarm")
 
-print(failures == 0 ? "\nall 17 cases pass" : "\n\(failures) FAILED")
+// The history window behind the menu bar sparklines. It has to drop the oldest
+// reading once it is full, or three minutes of traces would grow without end.
+func checkWindow(_ name: String, _ start: [Int], _ value: Int, _ limit: Int, _ expected: [Int]) {
+    let got = appending(value, to: start, limit: limit)
+    let ok = got == expected
+    if !ok { failures += 1 }
+    print("\(ok ? "PASS" : "FAIL")  \(name.padding(toLength: 36, withPad: " ", startingAt: 0)) " +
+          "\(got)" + (ok ? "" : "  expected \(expected)"))
+}
+
+checkWindow("first reading into an empty window", [],        1, 3, [1])
+checkWindow("still filling, nothing dropped",     [1, 2],    3, 3, [1, 2, 3])
+checkWindow("full, oldest falls off the back",    [1, 2, 3], 4, 3, [2, 3, 4])
+checkWindow("over-long window trimmed to fit",    [1, 2, 3], 4, 2, [3, 4])
+checkWindow("a window of one keeps only the new", [1],       2, 1, [2])
+checkWindow("limit of zero keeps nothing",        [1, 2],    3, 0, [])
+
+print(failures == 0 ? "\nall 23 cases pass" : "\n\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

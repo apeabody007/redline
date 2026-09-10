@@ -149,6 +149,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var detailPanel: NSPanel?
     private var detailHosting: NSHostingView<DetailView>!
     private var hoverWork: DispatchWorkItem?
+    private var menuDetailPanel: NSPanel?
+    private var menuDetailHosting: NSHostingView<MenuBarDetailView>!
+    private var menuHoverWork: DispatchWorkItem?
+    private var menuIsOpen = false
 
     private var hudVisible: Bool {
         get { UserDefaults.standard.object(forKey: "hudVisible") as? Bool ?? true }
@@ -226,6 +230,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeDetailPanel() -> NSPanel {
         detailHosting = NSHostingView(rootView: DetailView(sampler: sampler,
                                                           width: panel.frame.width))
+        return makeFloatingPanel(content: detailHosting)
+    }
+
+    /// The window both hover panels live in. It floats over everything, never
+    /// takes focus, and never takes the hover away from whatever opened it,
+    /// which would otherwise make it flicker itself in and out.
+    private func makeFloatingPanel(content: NSView) -> NSPanel {
         let new = NSPanel(contentRect: .zero,
                           styleMask: [.borderless, .nonactivatingPanel],
                           backing: .buffered, defer: false)
@@ -236,12 +247,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         new.backgroundColor = .clear
         new.hasShadow = true
         new.hidesOnDeactivate = false
-        // Never let the detail panel take the hover away from the pill, which
-        // would make it flicker itself in and out.
         new.ignoresMouseEvents = true
         new.appearance = panel.appearance
-        new.contentView = detailHosting
+        new.contentView = content
         return new
+    }
+
+    // MARK: - Menu bar hover
+
+    /// Same held-back opening as the pill, so sweeping the pointer along the
+    /// menu bar on the way to another icon does not flash a panel at you.
+    private func menuHoverChanged(_ inside: Bool) {
+        menuHoverWork?.cancel()
+        guard inside else {
+            menuDetailPanel?.orderOut(nil)
+            return
+        }
+        let work = DispatchWorkItem { [weak self] in self?.showMenuDetail() }
+        menuHoverWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    private func showMenuDetail() {
+        // Clicking opens the menu under the same icon. The menu wins.
+        guard !menuIsOpen else { return }
+        let panelToShow = menuDetailPanel ?? makeMenuDetailPanel()
+        menuDetailPanel = panelToShow
+        panelToShow.setContentSize(menuDetailHosting.fittingSize)
+        positionMenuDetail(panelToShow)
+        panelToShow.orderFrontRegardless()
+    }
+
+    private func makeMenuDetailPanel() -> NSPanel {
+        menuDetailHosting = NSHostingView(rootView: MenuBarDetailView(sampler: sampler))
+        return makeFloatingPanel(content: menuDetailHosting)
+    }
+
+    /// Centred under the icon, then pulled back inside the display, which is
+    /// what saves it when the icon sits hard against the right edge.
+    private func positionMenuDetail(_ detail: NSPanel) {
+        guard let button = statusItem.button, let window = button.window else { return }
+        let icon = window.convertToScreen(button.convert(button.bounds, to: nil))
+        let size = detail.frame.size
+        let screen = NSScreen.screens.first { $0.frame.intersects(icon) } ?? NSScreen.main
+        let bounds = (screen?.frame ?? icon).insetBy(dx: 4, dy: 0)
+
+        let wanted = CGRect(x: icon.midX - size.width / 2,
+                            y: icon.minY - size.height - 6,
+                            width: size.width, height: size.height)
+        detail.setFrameOrigin(clampedHorizontally(wanted, into: bounds).origin)
     }
 
     /// Under the pill by default, flipped above it when there is no room, and
@@ -300,6 +354,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .withSymbolConfiguration(.init(pointSize: 16, weight: .regular))
         icon?.isTemplate = true
         statusItem.button?.image = icon
+
+        // The button keeps its menu; this only watches the pointer crossing it.
+        if let button = statusItem.button {
+            let tracker = HoverView(frame: button.bounds)
+            tracker.autoresizingMask = [.width, .height]
+            tracker.clickThrough = true
+            tracker.onHover = { [weak self] inside in self?.menuHoverChanged(inside) }
+            button.addSubview(tracker)
+        }
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Show HUD", action: #selector(toggleHUD), keyEquivalent: "")
@@ -364,6 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .dark:  panel.appearance = NSAppearance(named: .darkAqua)
         }
         detailPanel?.appearance = panel.appearance
+        menuDetailPanel?.appearance = panel.appearance
     }
 
     @objc private func toggleLoginItem() {
@@ -381,6 +445,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        menuIsOpen = true
+        menuHoverWork?.cancel()
+        menuDetailPanel?.orderOut(nil)
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        menuIsOpen = false
+    }
+
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTitle: "Show HUD")?.state = hudVisible ? .on : .off
         menu.item(withTitle: "Use Fahrenheit")?.state = Temp.preference ? .on : .off
