@@ -6,13 +6,89 @@ import IOKit
 /// does not expose that counter, which is how the app stays portable
 /// across chip generations.
 struct Sample {
+    /// The headline number: the fastest tier's utilization when the chip
+    /// reports tiers, otherwise the aggregate. On an 18-core M5 Pro, six
+    /// saturated top-tier cores are only 33% of the aggregate, so the old
+    /// average read "calm" while the machine was at its performance ceiling.
     var cpu: Double = 0          // 0...1
+    var cpuAggregate: Double = 0 // 0...1, every core weighted equally
+    var cpuTiers: [TierUsage] = []
     var gpu: Double?             // 0...1
     var ram: Double = 0          // 0...1
     var ramUsedGB: Double = 0
     var tempC: Double?
     var thermal: ProcessInfo.ThermalState = .nominal
     var memoryPressure: MemoryPressure = .normal
+}
+
+struct TierUsage {
+    let name: String
+    let usage: Double   // 0...1
+    let cores: Int
+}
+
+/// Splits the flat `host_processor_info` array into the chip's core tiers.
+///
+/// Cores are laid out slowest tier first, fastest last: on an M2 that is four
+/// efficiency cores then four performance, and on an M5 Pro twelve then six.
+/// `hw.perflevel0` is always the fastest tier, so its block sits at the END of
+/// the array. Returns nil if the counts do not add up to the core count, in
+/// which case the caller falls back to a single aggregate number rather than
+/// reporting a split it cannot justify.
+func tierRanges(coreCounts: [Int], totalCores: Int) -> [Range<Int>]? {
+    guard !coreCounts.isEmpty, coreCounts.allSatisfy({ $0 > 0 }),
+          coreCounts.reduce(0, +) == totalCores else { return nil }
+
+    var ranges = [Range<Int>](repeating: 0..<0, count: coreCounts.count)
+    var start = 0
+    for level in stride(from: coreCounts.count - 1, through: 0, by: -1) {
+        ranges[level] = start..<(start + coreCounts[level])
+        start += coreCounts[level]
+    }
+    return ranges
+}
+
+/// One tier of cores, named by the kernel rather than by convention.
+///
+/// The M-series used to be Performance plus Efficiency. This M5 Pro reports
+/// "Super" and "Performance" and has no efficiency level at all, so the names
+/// are read from `hw.perflevelN.name` and never assumed. Same reasoning as the
+/// temperature sensors: discover what the chip says, do not hardcode a
+/// generation.
+struct CoreTier {
+    let name: String
+    let range: Range<Int>
+    var count: Int { range.count }
+}
+
+enum CoreTopology {
+    /// Fastest tier first. Empty when the machine does not report perf levels,
+    /// such as on Intel.
+    static let tiers: [CoreTier] = {
+        guard let levels = sysctlInt("hw.nperflevels"), levels > 1,
+              let total = sysctlInt("hw.logicalcpu") else { return [] }
+        let counts = (0..<levels).map { sysctlInt("hw.perflevel\($0).logicalcpu") ?? 0 }
+        guard let ranges = tierRanges(coreCounts: counts, totalCores: total) else { return [] }
+        return (0..<levels).map {
+            CoreTier(name: sysctlString("hw.perflevel\($0).name") ?? "Tier \($0)",
+                     range: ranges[$0])
+        }
+    }()
+}
+
+func sysctlInt(_ name: String) -> Int? {
+    var value = 0
+    var size = MemoryLayout<Int>.size
+    guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+    return value
+}
+
+func sysctlString(_ name: String) -> String? {
+    var size = 0
+    guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+    var buffer = [CChar](repeating: 0, count: size)
+    guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
+    return String(cString: buffer)
 }
 
 /// Slides `frame` horizontally until it sits inside `bounds`.
@@ -123,7 +199,7 @@ final class Sampler: ObservableObject {
     static let historyLimit = 180
 
     private var timer: Timer?
-    private var prevTicks: (used: Double, total: Double)?
+    private var prevCores: [(used: Double, total: Double)]?
     private let sensors = TemperatureSensors()
 
     func start(interval: TimeInterval = 1.0) {
@@ -140,7 +216,12 @@ final class Sampler: ObservableObject {
 
     private func tick() {
         var s = Sample()
-        s.cpu = readCPU()
+        let cpu = readCPU()
+        s.cpuAggregate = cpu.aggregate
+        s.cpuTiers = cpu.tiers
+        // The fastest tier is the headline, because that is the one that decides
+        // whether the machine feels slow. Without tier data this is the average.
+        s.cpu = cpu.tiers.first?.usage ?? cpu.aggregate
         s.gpu = readGPU()
         let mem = readMemory()
         s.ram = mem.fraction
@@ -154,14 +235,14 @@ final class Sampler: ObservableObject {
 
     // MARK: - CPU
 
-    private func readCPU() -> Double {
+    private func readCPU() -> (aggregate: Double, tiers: [TierUsage]) {
         var count: natural_t = 0
         var infoCount: mach_msg_type_number_t = 0
         var info: processor_info_array_t?
 
         guard host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO,
                                   &count, &info, &infoCount) == KERN_SUCCESS,
-              let info else { return prevTicks == nil ? 0 : sample.cpu }
+              let info else { return (sample.cpuAggregate, sample.cpuTiers) }
 
         defer {
             vm_deallocate(mach_task_self_,
@@ -169,22 +250,39 @@ final class Sampler: ObservableObject {
                           vm_size_t(infoCount) * vm_size_t(MemoryLayout<integer_t>.stride))
         }
 
-        var used = 0.0, total = 0.0
+        var perCore: [(used: Double, total: Double)] = []
+        perCore.reserveCapacity(Int(count))
         for core in 0..<Int(count) {
             let base = core * Int(CPU_STATE_MAX)
             let user = Double(info[base + Int(CPU_STATE_USER)])
             let system = Double(info[base + Int(CPU_STATE_SYSTEM)])
             let nice = Double(info[base + Int(CPU_STATE_NICE)])
             let idle = Double(info[base + Int(CPU_STATE_IDLE)])
-            used += user + system + nice
-            total += user + system + nice + idle
+            perCore.append((user + system + nice, user + system + nice + idle))
         }
 
-        defer { prevTicks = (used, total) }
-        guard let prev = prevTicks else { return 0 }
-        let dTotal = total - prev.total
-        guard dTotal > 0 else { return sample.cpu }
-        return min(max((used - prev.used) / dTotal, 0), 1)
+        defer { prevCores = perCore }
+        guard let previous = prevCores, previous.count == perCore.count else {
+            return (aggregate: 0, tiers: [])
+        }
+
+        /// Busy fraction over a set of cores between the last tick and this one.
+        func busy(_ range: Range<Int>) -> Double? {
+            var used = 0.0, total = 0.0
+            for core in range where core < perCore.count {
+                used += perCore[core].used - previous[core].used
+                total += perCore[core].total - previous[core].total
+            }
+            guard total > 0 else { return nil }
+            return min(max(used / total, 0), 1)
+        }
+
+        let aggregate = busy(0..<perCore.count) ?? sample.cpuAggregate
+        let tiers = CoreTopology.tiers.compactMap { tier -> TierUsage? in
+            guard let usage = busy(tier.range) else { return nil }
+            return TierUsage(name: tier.name, usage: usage, cores: tier.count)
+        }
+        return (aggregate, tiers)
     }
 
     // MARK: - Memory

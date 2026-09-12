@@ -72,5 +72,22 @@ checkWindow("over-long window trimmed to fit",    [1, 2, 3], 4, 2, [3, 4])
 checkWindow("a window of one keeps only the new", [1],       2, 1, [2])
 checkWindow("limit of zero keeps nothing",        [1, 2],    3, 0, [])
 
-print(failures == 0 ? "\nall 23 cases pass" : "\n\(failures) FAILED")
+// Core tiers. The fastest tier (perflevel0) sits at the END of the flat
+// host_processor_info array, verified on an M5 Pro by pegging cores and
+// watching which indices lit up.
+func checkTiers(_ counts: [Int], _ total: Int, _ expected: [Range<Int>]?, _ note: String) {
+    let got = tierRanges(coreCounts: counts, totalCores: total)
+    let ok = got == expected
+    if !ok { failures += 1 }
+    let shown = got.map { $0.map { "\($0.lowerBound)..<\($0.upperBound)" }.joined(separator: " ") } ?? "nil"
+    print("\(ok ? "PASS" : "FAIL")  tiers \(counts) of \(total) -> \(shown)  \(note)")
+}
+
+checkTiers([6, 12], 18, [12..<18, 0..<12], "M5 Pro: 6 fastest last, 12 first")
+checkTiers([4, 4], 8, [4..<8, 0..<4], "M2 Air: 4 performance last")
+checkTiers([8], 8, [0..<8], "single tier fills the array")
+checkTiers([6, 12], 16, nil, "counts do not sum: refuse to guess")
+checkTiers([], 8, nil, "no tiers reported")
+checkTiers([0, 8], 8, nil, "a zero-core tier is nonsense")
+print(failures == 0 ? "\nall \(23 + 6) cases pass" : "\n\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

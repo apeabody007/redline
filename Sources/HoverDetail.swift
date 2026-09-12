@@ -77,8 +77,20 @@ struct DetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            row("CPU", percent(vitals.cpu),
-                "\(ProcessInfo.processInfo.processorCount) cores")
+            if vitals.cpuTiers.isEmpty {
+                row("CPU", percent(vitals.cpu),
+                    "\(ProcessInfo.processInfo.processorCount) cores")
+            } else {
+                // A row per tier, labelled with the name the kernel reports.
+                // The first is the fastest, and the one the pill shows.
+                ForEach(Array(vitals.cpuTiers.enumerated()), id: \.offset) { index, tier in
+                    row(index == 0 ? "CPU" : "",
+                        percent(tier.usage),
+                        "\(tier.cores) \(tier.name.lowercased())")
+                }
+                row("all", percent(vitals.cpuAggregate),
+                    "\(ProcessInfo.processInfo.processorCount) cores together")
+            }
             if let gpu = vitals.gpu {
                 row("GPU", percent(gpu), "graphics")
             }

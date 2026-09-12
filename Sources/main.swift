@@ -51,6 +51,14 @@ if CommandLine.arguments.contains("--once") {
     RunLoop.main.run(until: Date().addingTimeInterval(1.2))
     let s = sampler.sample
     print(String(format: "CPU %.1f%%", s.cpu * 100))
+    for tier in s.cpuTiers {
+        print(String(format: "  %-12s %.1f%% (%d cores)",
+                     (tier.name as NSString).utf8String!, tier.usage * 100, tier.cores))
+    }
+    if !s.cpuTiers.isEmpty {
+        print(String(format: "  %-12s %.1f%%", ("all cores" as NSString).utf8String!,
+                     s.cpuAggregate * 100))
+    }
     print(s.gpu.map { String(format: "GPU %.1f%%", $0 * 100) } ?? "GPU unavailable")
     print(String(format: "RAM %.1f%% (%.2f GB)", s.ram * 100, s.ramUsedGB))
     print(s.tempC.map { "Die " + Temp.string($0, fahrenheit: Temp.preference, decimals: 1) }
