@@ -78,7 +78,8 @@ The menu bar item holds the rest:
   perfectly healthy or can be thrashing, and the percentage alone cannot tell
   you which. Temperature ignores this toggle and always tracks thermal pressure.
 - **Use Fahrenheit**: on by default, switch it off for Celsius.
-- **Ap**: tucks the pill into the bottom-right corner of its display.
+- **Ap**: tucks the pill into the bottom-right corner of its display, and is
+  ticked for as long as it sits there.
 - **Pin to Front**: on by default, so the pill floats above everything. Switch
   it off and it becomes an ordinary window that other apps can cover.
 - **Launch at Login**, plus **Show HUD** and **Reset Position** if you lose it.

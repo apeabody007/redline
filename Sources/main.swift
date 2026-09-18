@@ -438,10 +438,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// on, flush with the right edge and just clear of the bottom. The pill
     /// grows leftward, so it stays in the corner as its width changes.
     @objc private func moveToBottomRight() {
-        let screen = NSScreen.screens.first { $0.frame.intersects(panel.frame) } ?? NSScreen.main
-        guard let bounds = screen?.frame else { return }
-        panel.setFrameOrigin(NSPoint(x: bounds.maxX - panel.frame.width, y: bounds.minY + 1))
+        guard let corner = bottomRightOrigin() else { return }
+        panel.setFrameOrigin(corner)
         if !hudVisible { toggleHUD() }
+    }
+
+    private func bottomRightOrigin() -> NSPoint? {
+        let screen = NSScreen.screens.first { $0.frame.intersects(panel.frame) } ?? NSScreen.main
+        guard let bounds = screen?.frame else { return nil }
+        return NSPoint(x: bounds.maxX - panel.frame.width, y: bounds.minY + 1)
     }
 
     @objc private func resetPosition() {
@@ -504,6 +509,8 @@ extension AppDelegate: NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTitle: "Show HUD")?.state = hudVisible ? .on : .off
+        // Ticked for as long as the pill sits in that corner, by Ap or by hand.
+        menu.item(withTitle: "Ap")?.state = panel.frame.origin == bottomRightOrigin() ? .on : .off
         menu.item(withTitle: "Pin to Front")?.state =
             UserDefaults.standard.bool(forKey: HUDPanel.pinKey) ? .on : .off
         menu.item(withTitle: "Use Fahrenheit")?.state = Temp.preference ? .on : .off
