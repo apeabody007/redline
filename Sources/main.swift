@@ -5,7 +5,8 @@ import SwiftUI
 
 // Fahrenheit and severity colors unless the menu says otherwise.
 UserDefaults.standard.register(defaults: [Temp.key: Temp.defaultsToFahrenheit,
-                                          Appearance.severityKey: true])
+                                          Appearance.severityKey: true,
+                                          HUDPanel.pinKey: true])
 
 // Anything unrecognized used to fall through and silently launch a second copy
 // of the HUD, which is a poor answer to someone typing --help.
@@ -73,8 +74,7 @@ final class HUDPanel: NSPanel {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 280, height: 34),
                    styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
-        isFloatingPanel = true
-        level = .statusBar
+        applyPin()
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear
@@ -143,6 +143,26 @@ final class HUDPanel: NSPanel {
     }
 
     private var clamping = false
+
+    static let pinKey = "pinToFront"
+
+    /// Pinned, the pill floats above every window, the menu bar and the Dock.
+    /// Unpinned, it is an ordinary window that other apps can cover.
+    func applyPin() {
+        let pinned = UserDefaults.standard.bool(forKey: Self.pinKey)
+        isFloatingPanel = pinned
+        level = pinned ? .statusBar : .normal
+    }
+
+    /// macOS 27 stopped honouring isMovableByWindowBackground for the SwiftUI
+    /// content, so a press anywhere on the pill starts the drag by hand.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown {
+            performDrag(with: event)
+            return
+        }
+        super.sendEvent(event)
+    }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -375,6 +395,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Show HUD", action: #selector(toggleHUD), keyEquivalent: "")
         menu.addItem(withTitle: "Reset Position", action: #selector(resetPosition), keyEquivalent: "")
+        menu.addItem(withTitle: "Ap", action: #selector(moveToBottomRight), keyEquivalent: "")
+        menu.addItem(withTitle: "Pin to Front", action: #selector(togglePin), keyEquivalent: "")
         menu.addItem(.separator())
 
         let appearanceItem = NSMenuItem(title: "Appearance", action: nil, keyEquivalent: "")
@@ -403,6 +425,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleHUD() {
         hudVisible.toggle()
         if hudVisible { panel.orderFrontRegardless() } else { panel.orderOut(nil) }
+    }
+
+    @objc private func togglePin() {
+        let on = UserDefaults.standard.bool(forKey: HUDPanel.pinKey)
+        UserDefaults.standard.set(!on, forKey: HUDPanel.pinKey)
+        panel.applyPin()
+        if hudVisible { panel.orderFrontRegardless() }
+    }
+
+    /// Tucked into the bottom-right corner of whichever display the pill is
+    /// on, flush with the right edge and just clear of the bottom. The pill
+    /// grows leftward, so it stays in the corner as its width changes.
+    @objc private func moveToBottomRight() {
+        let screen = NSScreen.screens.first { $0.frame.intersects(panel.frame) } ?? NSScreen.main
+        guard let bounds = screen?.frame else { return }
+        panel.setFrameOrigin(NSPoint(x: bounds.maxX - panel.frame.width, y: bounds.minY + 1))
+        if !hudVisible { toggleHUD() }
     }
 
     @objc private func resetPosition() {
@@ -465,6 +504,8 @@ extension AppDelegate: NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTitle: "Show HUD")?.state = hudVisible ? .on : .off
+        menu.item(withTitle: "Pin to Front")?.state =
+            UserDefaults.standard.bool(forKey: HUDPanel.pinKey) ? .on : .off
         menu.item(withTitle: "Use Fahrenheit")?.state = Temp.preference ? .on : .off
         menu.item(withTitle: "Severity Colors")?.state =
             UserDefaults.standard.bool(forKey: Appearance.severityKey) ? .on : .off
