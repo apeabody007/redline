@@ -64,6 +64,7 @@ final class HoverView: NSView {
 /// than as a box that happened to open near another box.
 struct DetailView: View {
     @ObservedObject var sampler: Sampler
+    @ObservedObject var topApps: TopAppsSampler
     let width: CGFloat
 
     @AppStorage(Temp.key) private var fahrenheit = Temp.defaultsToFahrenheit
@@ -100,6 +101,16 @@ struct DetailView: View {
                     Temp.string(temp, fahrenheit: fahrenheit)
                         .trimmingCharacters(in: .whitespaces),
                     "hottest die")
+            }
+
+            if !topApps.apps.isEmpty {
+                Divider().opacity(0.28).padding(.vertical, 1)
+
+                // Who the RAM figure above is actually going to, with each
+                // app's helper processes counted as part of it.
+                ForEach(Array(topApps.apps.enumerated()), id: \.offset) { index, app in
+                    row(index == 0 ? "Top" : "", memoryString(app.bytes), app.name)
+                }
             }
 
             Divider().opacity(0.28).padding(.vertical, 1)

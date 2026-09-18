@@ -59,6 +59,12 @@ of and what macOS makes of it, how many cores are behind the CPU number, and
 what the thermal state means in plain words. It appears below the pill, or
 above it when there is no room.
 
+Both hover panels also list the three apps holding the most memory, with each
+app's helper processes counted as part of it, so Chrome shows up as Chrome
+rather than as a dozen renderers. The figure is the same one Activity Monitor's
+Memory column uses. Walking every process is the most expensive thing Redline
+does, so it only happens while one of the panels is open.
+
 <img src="docs/hover-panel.png" width="400" alt="The hover panel, showing CPU 33% across 8 cores, GPU 100%, RAM 72% at 5.80 of 8 GB, Temp 115F, memory pressure normal and thermal nominal">
 
 Hover the menu bar icon instead and you get the last three minutes: a trace per

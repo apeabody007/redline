@@ -170,6 +170,7 @@ final class HUDPanel: NSPanel {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let sampler = Sampler()
+    private let topApps = TopAppsSampler()
     private var panel: HUDPanel!
     private var hosting: NSHostingView<HUDView>!
     private var statusItem: NSStatusItem!
@@ -236,6 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hoverWork?.cancel()
         guard inside else {
             detailPanel?.orderOut(nil)
+            updateTopAppsScanning()
             return
         }
         let work = DispatchWorkItem { [weak self] in self?.showDetail() }
@@ -246,17 +248,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showDetail() {
         let panelToShow = detailPanel ?? makeDetailPanel()
         detailPanel = panelToShow
+        topApps.start()
         // Re-read the pill's width every time: it changes when the units are
         // switched or the throttle tag appears, and the two should always be
         // the same width.
-        detailHosting.rootView = DetailView(sampler: sampler, width: panel.frame.width)
+        detailHosting.rootView = DetailView(sampler: sampler, topApps: topApps,
+                                            width: panel.frame.width)
         panelToShow.setContentSize(detailHosting.fittingSize)
         positionDetail(panelToShow)
         panelToShow.orderFrontRegardless()
     }
 
     private func makeDetailPanel() -> NSPanel {
-        detailHosting = NSHostingView(rootView: DetailView(sampler: sampler,
+        detailHosting = NSHostingView(rootView: DetailView(sampler: sampler, topApps: topApps,
                                                           width: panel.frame.width))
         return makeFloatingPanel(content: detailHosting)
     }
@@ -289,6 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuHoverWork?.cancel()
         guard inside else {
             menuDetailPanel?.orderOut(nil)
+            updateTopAppsScanning()
             return
         }
         let work = DispatchWorkItem { [weak self] in self?.showMenuDetail() }
@@ -301,13 +306,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !menuIsOpen else { return }
         let panelToShow = menuDetailPanel ?? makeMenuDetailPanel()
         menuDetailPanel = panelToShow
+        topApps.start()
         panelToShow.setContentSize(menuDetailHosting.fittingSize)
         positionMenuDetail(panelToShow)
         panelToShow.orderFrontRegardless()
     }
 
+    /// The process walk behind the top apps rows only runs while one of the
+    /// two panels is actually showing them.
+    private func updateTopAppsScanning() {
+        if detailPanel?.isVisible != true && menuDetailPanel?.isVisible != true {
+            topApps.stop()
+        }
+    }
+
     private func makeMenuDetailPanel() -> NSPanel {
-        menuDetailHosting = NSHostingView(rootView: MenuBarDetailView(sampler: sampler))
+        menuDetailHosting = NSHostingView(rootView: MenuBarDetailView(sampler: sampler,
+                                                                      topApps: topApps))
         return makeFloatingPanel(content: menuDetailHosting)
     }
 
@@ -501,6 +516,7 @@ extension AppDelegate: NSMenuDelegate {
         menuIsOpen = true
         menuHoverWork?.cancel()
         menuDetailPanel?.orderOut(nil)
+        updateTopAppsScanning()
     }
 
     func menuDidClose(_ menu: NSMenu) {

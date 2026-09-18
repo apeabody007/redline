@@ -43,6 +43,7 @@ struct Sparkline: Shape {
 /// thing the pill cannot tell you no matter how long you stare at it.
 struct MenuBarDetailView: View {
     @ObservedObject var sampler: Sampler
+    @ObservedObject var topApps: TopAppsSampler
 
     @AppStorage(Temp.key) private var fahrenheit = Temp.defaultsToFahrenheit
 
@@ -76,6 +77,22 @@ struct MenuBarDetailView: View {
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .padding(.top, 1)
+
+            if !topApps.apps.isEmpty {
+                Divider().opacity(0.28).padding(.vertical, 1)
+
+                // The traces say memory climbed; this says who took it.
+                ForEach(Array(topApps.apps.enumerated()), id: \.offset) { _, app in
+                    HStack(spacing: 8) {
+                        Text(app.name)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(memoryString(app.bytes))
+                            .monospacedDigit()
+                    }
+                }
+            }
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
         .padding(.horizontal, 14)

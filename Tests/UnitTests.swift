@@ -89,5 +89,51 @@ checkTiers([8], 8, [0..<8], "single tier fills the array")
 checkTiers([6, 12], 16, nil, "counts do not sum: refuse to guess")
 checkTiers([], 8, nil, "no tiers reported")
 checkTiers([0, 8], 8, nil, "a zero-core tier is nonsense")
-print(failures == 0 ? "\nall \(23 + 6) cases pass" : "\n\(failures) FAILED")
+// Top apps. Helpers belong to the OUTERMOST bundle, or Chrome would show up
+// as a dozen helpers instead of as Chrome.
+func checkName(_ path: String, _ expected: String, _ note: String) {
+    let got = appName(forExecutable: path)
+    let ok = got == expected
+    if !ok { failures += 1 }
+    print("\(ok ? "PASS" : "FAIL")  app name \(got.padding(toLength: 16, withPad: " ", startingAt: 0)) \(note)" +
+          (ok ? "" : "  expected \(expected)"))
+}
+
+checkName("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "Google Chrome", "the app itself")
+checkName("/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/140/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)",
+          "Google Chrome", "a renderer counts as Chrome")
+checkName("/usr/local/bin/node", "node", "no bundle: executable name")
+checkName("/System/Applications/Mail.app/Contents/MacOS/Mail", "Mail", "system app")
+
+let gb: UInt64 = 1_073_741_824, mb: UInt64 = 1_048_576
+let grouped = topApps([
+    ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", 1 * gb),
+    ("/Applications/Google Chrome.app/Contents/Frameworks/X.framework/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/H", 2 * gb),
+    ("/Applications/Slack.app/Contents/MacOS/Slack", 2 * gb),
+    ("/usr/local/bin/node", 500 * mb),
+    ("/Applications/Mail.app/Contents/MacOS/Mail", 100 * mb),
+], limit: 3)
+let groupedOK = grouped == [AppMemory(name: "Google Chrome", bytes: 3 * gb),
+                            AppMemory(name: "Slack", bytes: 2 * gb),
+                            AppMemory(name: "node", bytes: 500 * mb)]
+if !groupedOK { failures += 1 }
+print("\(groupedOK ? "PASS" : "FAIL")  helpers summed, largest three kept    \(grouped.map { "\($0.name) \(memoryString($0.bytes))" })")
+
+let tie = topApps([("/a/Zed.app/Contents/MacOS/Zed", mb), ("/a/Arc.app/Contents/MacOS/Arc", mb)], limit: 3)
+let tieOK = tie.map(\.name) == ["Arc", "Zed"]
+if !tieOK { failures += 1 }
+print("\(tieOK ? "PASS" : "FAIL")  a tie sorts by name, so it cannot flicker \(tie.map(\.name))")
+
+func checkSize(_ bytes: UInt64, _ expected: String) {
+    let got = memoryString(bytes)
+    let ok = got == expected
+    if !ok { failures += 1 }
+    print("\(ok ? "PASS" : "FAIL")  size \(bytes) -> \(got)" + (ok ? "" : "  expected \(expected)"))
+}
+
+checkSize(850 * mb, "850 MB")
+checkSize(1024 * mb, "1.0 GB")
+checkSize(6 * gb + 100 * mb, "6.1 GB")
+
+print(failures == 0 ? "\nall \(23 + 6 + 9) cases pass" : "\n\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

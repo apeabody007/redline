@@ -21,7 +21,7 @@ if [[ "${1:-}" == "test" ]]; then
   mkdir -p build/tests
   # The test file holds top-level code, so it has to be named main.swift.
   cp Tests/UnitTests.swift build/tests/main.swift
-  swiftc -O Sources/Metrics.swift Sources/Sensors.swift build/tests/main.swift \
+  swiftc -O Sources/Metrics.swift Sources/Sensors.swift Sources/TopApps.swift build/tests/main.swift \
     -o build/tests/unittests
   exec build/tests/unittests
 fi
