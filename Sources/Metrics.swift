@@ -309,9 +309,50 @@ final class Sampler: ObservableObject {
 
     // MARK: - GPU
 
-    /// Reads "Device Utilization %" out of the accelerator's performance
-    /// statistics. Present on Intel and every Apple Silicon generation so far;
-    /// returns nil rather than guessing if a future chip drops the key.
+    /// The utilization keys worth reading, in order of preference.
+    static let gpuUtilizationKeys = ["Device Utilization %",
+                                     "Renderer Utilization %",
+                                     "Tiler Utilization %"]
+
+    /// How long every counter must sit at 100% before we stop believing them.
+    static let gpuPinnedGrace: TimeInterval = 30
+
+    /// When the counters first went pinned, or nil while they are still moving.
+    private var gpuPinnedSince: Date?
+
+    /// Decides whether utilization readings can still be trusted.
+    ///
+    /// These counters measure the share of time the GPU was not powered down,
+    /// which is not the same as the share of time it was busy. On Apple Silicon
+    /// from M5 on they sit at exactly 100% forever, because a Mac driving a
+    /// display never lets the GPU power off — measured on an M5 Pro, every key
+    /// read 100 while the machine drew 20W in total and IOReport put the GPU's
+    /// OFF residency at zero. Earlier chips varied the value, so the key cannot
+    /// simply be ignored.
+    ///
+    /// A GPU genuinely saturated for half a minute is possible, so a single
+    /// pinned reading proves nothing. Sustained pinning across every counter
+    /// does: the renderer and tiler are separate units and do not hold identical
+    /// full readings for that long under real work. Returning nil blanks the
+    /// GPU row rather than showing a number known to be wrong.
+    static func trustedGPU(values: [Double], now: Date,
+                           pinnedSince: inout Date?,
+                           grace: TimeInterval = gpuPinnedGrace) -> Double? {
+        guard let best = values.max() else {
+            pinnedSince = nil
+            return nil
+        }
+        guard values.allSatisfy({ $0 >= 1 }) else {
+            pinnedSince = nil
+            return best
+        }
+        let since = pinnedSince ?? now
+        pinnedSince = since
+        return now.timeIntervalSince(since) >= grace ? nil : best
+    }
+
+    /// Reads the accelerator's utilization counters, then hands them to
+    /// `trustedGPU` to decide whether they still mean anything on this machine.
     private func readGPU() -> Double? {
         var iterator = io_iterator_t()
         guard IOServiceGetMatchingServices(kIOMainPortDefault,
@@ -319,20 +360,19 @@ final class Sampler: ObservableObject {
                                            &iterator) == KERN_SUCCESS else { return nil }
         defer { IOObjectRelease(iterator) }
 
-        var best: Double?
+        var values: [Double] = []
         while case let service = IOIteratorNext(iterator), service != 0 {
             defer { IOObjectRelease(service) }
             guard let stats = IORegistryEntryCreateCFProperty(
                     service, "PerformanceStatistics" as CFString,
                     kCFAllocatorDefault, 0)?.takeRetainedValue() as? [String: Any] else { continue }
 
-            let value = (stats["Device Utilization %"] as? NSNumber)
-                ?? (stats["Renderer Utilization %"] as? NSNumber)
-            if let value {
+            for key in Self.gpuUtilizationKeys {
+                guard let value = stats[key] as? NSNumber else { continue }
                 let pct = value.doubleValue > 1.5 ? value.doubleValue / 100 : value.doubleValue
-                best = max(best ?? 0, min(pct, 1))
+                values.append(min(pct, 1))
             }
         }
-        return best
+        return Self.trustedGPU(values: values, now: Date(), pinnedSince: &gpuPinnedSince)
     }
 }

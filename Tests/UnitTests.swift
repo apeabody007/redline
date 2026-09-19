@@ -135,5 +135,51 @@ checkSize(850 * mb, "850 MB")
 checkSize(1024 * mb, "1.0 GB")
 checkSize(6 * gb + 100 * mb, "6.1 GB")
 
-print(failures == 0 ? "\nall \(23 + 6 + 9) cases pass" : "\n\(failures) FAILED")
+// GPU utilization. The counters report "not powered down" rather than "busy",
+// so on an M5 Pro they sit at exactly 100% forever while the machine idles at
+// 20W. Blanking beats showing a number that is known to be wrong, but only
+// after sustained pinning: a GPU really can be flat out for a few seconds.
+let t0 = Date(timeIntervalSince1970: 0)
+func checkGPU(_ name: String, _ values: [Double], _ afterSeconds: TimeInterval,
+              _ expected: Double?, pinnedSince: inout Date?) {
+    let got = Sampler.trustedGPU(values: values, now: t0.addingTimeInterval(afterSeconds),
+                                 pinnedSince: &pinnedSince, grace: 30)
+    let ok = got == expected
+    if !ok { failures += 1 }
+    let shown = got.map { String(format: "%.2f", $0) } ?? "blank"
+    print("\(ok ? "PASS" : "FAIL")  \(name.padding(toLength: 40, withPad: " ", startingAt: 0)) -> \(shown)" +
+          (ok ? "" : "  expected \(expected.map { String(format: "%.2f", $0) } ?? "blank")"))
+}
+
+var pin: Date? = nil
+checkGPU("no counters at all", [], 0, nil, pinnedSince: &pin)
+
+pin = nil
+checkGPU("counters moving, trust them", [1.0, 0.42, 0.13], 0, 1.0, pinnedSince: &pin)
+
+pin = nil
+checkGPU("all pinned, clock just started", [1.0, 1.0, 1.0], 0, 1.0, pinnedSince: &pin)
+checkGPU("all pinned, still inside grace", [1.0, 1.0, 1.0], 29, 1.0, pinnedSince: &pin)
+checkGPU("all pinned past grace, blank it", [1.0, 1.0, 1.0], 31, nil, pinnedSince: &pin)
+
+// One honest reading has to rearm it, or a machine whose counters work would
+// stay blanked forever after a single busy spell.
+checkGPU("a moving reading rearms trust", [1.0, 0.5, 1.0], 32, 1.0, pinnedSince: &pin)
+checkGPU("pinning again restarts the clock", [1.0, 1.0, 1.0], 40, 1.0, pinnedSince: &pin)
+checkGPU("and blanks once grace elapses again", [1.0, 1.0, 1.0], 71, nil, pinnedSince: &pin)
+
+// Older Macs expose only one of the three keys. One pinned counter is weaker
+// evidence than three, but a single key stuck at 100% for half a minute is
+// still not a reading worth showing. The clock starts when pinning is first
+// seen, so this needs two observations, not one late one.
+pin = nil
+checkGPU("lone counter, clock starts here", [1.0], 0, 1.0, pinnedSince: &pin)
+checkGPU("lone counter pinned past grace", [1.0], 31, nil, pinnedSince: &pin)
+
+// A first sighting that is already late must still start the clock rather than
+// blank immediately: we have no evidence about how long it was pinned before.
+pin = nil
+checkGPU("first sighting never blanks", [1.0, 1.0, 1.0], 9_999, 1.0, pinnedSince: &pin)
+
+print(failures == 0 ? "\nall \(23 + 6 + 9 + 11) cases pass" : "\n\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
